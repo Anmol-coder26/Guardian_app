@@ -3,7 +3,7 @@
 import { ContentInput } from "@/components/ContentInput";
 import { ModeTabs } from "@/components/ModeTabs";
 import { RiskVerdictPanel } from "@/components/RiskVerdictPanel";
-import { analyze } from "@/lib/api";
+import { analyze, analyzeAudio } from "@/lib/api";
 import type { AnalysisMode, AnalysisResult } from "@/lib/types";
 import { AlertCircle, Loader2, Search } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -11,6 +11,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 export default function AnalyzePage() {
   const [mode, setMode] = useState<AnalysisMode>("message");
   const [content, setContent] = useState("");
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [analyzedContent, setAnalyzedContent] = useState<string>("");
   const [loading, setLoading] = useState(false);
@@ -22,6 +23,7 @@ export default function AnalyzePage() {
   useEffect(() => {
     setResult(null);
     setError(null);
+    setAudioBlob(null);
   }, [mode]);
 
   const handleAnalyze = useCallback(async () => {
@@ -33,7 +35,12 @@ export default function AnalyzePage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await analyze(mode, trimmed);
+      let res: AnalysisResult;
+      if (mode === "call" && audioBlob) {
+        res = await analyzeAudio(audioBlob);
+      } else {
+        res = await analyze(mode, trimmed);
+      }
       setResult(res);
       setAnalyzedContent(trimmed);
       // Scroll to result on the next frame
@@ -52,7 +59,7 @@ export default function AnalyzePage() {
     } finally {
       setLoading(false);
     }
-  }, [mode, content]);
+  }, [mode, content, audioBlob]);
 
   return (
     <>
@@ -81,6 +88,7 @@ export default function AnalyzePage() {
               mode={mode}
               value={content}
               onChange={setContent}
+              onAudioChange={setAudioBlob}
               disabled={loading}
             />
 
@@ -98,6 +106,7 @@ export default function AnalyzePage() {
                       setContent("");
                       setResult(null);
                       setError(null);
+                      setAudioBlob(null);
                     }}
                     className="btn-ghost"
                     disabled={loading}

@@ -1,69 +1,56 @@
 """
-Veridra — FastAPI entry point.
-
-Exposes:
-    POST /api/analyze          run an analysis
-    GET  /api/insights         aggregated insights for the dashboard
-    GET  /api/history          recent analysis history
-    GET  /api/health           liveness check
+Guardian — Real-Time Digital Scam Protection Platform
+FastAPI main server with WebSocket event streaming, Agentic Risk Engine, and Proactive Threat Defense.
 """
 from __future__ import annotations
 
-from fastapi import FastAPI, HTTPException
+import os
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .modules.data_access import (
-    init_db,
-    insights_summary,
-    recent_history,
-    save_analysis,
-)
+from .guardian_db import init_guardian_db
+from .api_routes import router as guardian_router
+from .modules.data_access import init_db as init_veridra_db
 from .modules.pipeline import run_analysis
 from .modules.schemas import AnalysisRequest, AnalysisResult
 
-
 app = FastAPI(
-    title="Veridra API",
-    description="Public cyber safety analysis for suspicious messages, links, and job offers.",
-    version="1.0.0",
+    title="Guardian Real-Time Cyber Protection API",
+    description="Proactive, explainable, real-time scam and fraud defense engine.",
+    version="2.0.0",
 )
 
-# Initialize SQLite schema at import time. This is idempotent (CREATE IF NOT
-# EXISTS) and avoids relying on startup events, which don't fire under
-# FastAPI's TestClient or some ASGI servers.
-init_db()
+# Initialize persistent SQLite databases
+init_guardian_db()
+try:
+    init_veridra_db()
+except Exception:
+    pass
 
-# Frontend runs on 3000 in local dev. In production, tighten this.
+# Enable CORS for frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Mount Guardian API routes
+app.include_router(guardian_router, prefix="/api")
+
 
 @app.get("/api/health")
 def health() -> dict:
-    return {"status": "ok", "service": "veridra"}
+    return {
+        "status": "ok",
+        "service": "Guardian Cyber Defense Platform",
+        "version": "2.0.0",
+        "mode": "PROACTIVE_REALTIME",
+    }
 
 
+# Backward-compatible endpoint for classic manual analyzer if needed
 @app.post("/api/analyze", response_model=AnalysisResult)
 def analyze(req: AnalysisRequest) -> AnalysisResult:
-    try:
-        result = run_analysis(req)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-    # Persist a privacy-minimal record for aggregates
-    save_analysis(req.content, result)
-    return result
-
-
-@app.get("/api/insights")
-def insights() -> dict:
-    return insights_summary()
-
-
-@app.get("/api/history")
-def history(limit: int = 20) -> list:
-    limit = max(1, min(limit, 100))
-    return recent_history(limit)
+    return run_analysis(req)

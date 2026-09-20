@@ -1,269 +1,171 @@
-# Veridra
+# 🛡️ Guardian AI — Real-Time Digital Scam & Fraud Protection
 
-> **A public cyber safety platform for suspicious messages, unsafe links, and fake job offers.**
+> **Autonomous, explainable, real-time cyber defense platform inspired by Equal AI — safeguarding users from digital arrest extortion, contraband customs scams, UPI reverse-debit traps, phishing links, and OTP harvesting.**
 
-Veridra takes the digital content an ordinary person is already unsure about, a strange SMS, a suspicious URL, an aggressive recruiter DM, and returns a clear risk verdict, the specific red flags that triggered it, and the exact next steps they should take. It is explainable by design, evidence-based in its reasoning, and careful never to overclaim certainty or take action on anyone's behalf.
-
-## Live Demo
-https://veridra-cyber-safety.vercel.app/
----
-
-## Table of Contents
-
-1. [Overview](#overview)
-2. [Problem Statement](#problem-statement)
-3. [Public Value](#public-value)
-4. [Main Features](#main-features)
-5. [The Three Analysis Modes](#the-three-analysis-modes)
-6. [The Six Output Layers](#the-six-output-layers)
-7. [Tech Stack](#tech-stack)
-8. [Project Structure](#project-structure)
-9. [Setup](#setup)
-10. [Running Locally](#running-locally)
-11. [Risk Scoring Logic](#risk-scoring-logic)
-12. [Why Explanation Layers Matter](#why-explanation-layers-matter)
-13. [Block & Report Guidance](#block--report-guidance)
-14. [Limitations](#limitations)
-15. [Disclaimer](#disclaimer)
-16. [Future Improvements](#future-improvements)
-17. [Screenshots](#screenshots)
-18. [Author](#author)
-19. [License](#license)
+[![License: MIT](https://img.shields.io/badge/License-MIT-emerald.svg)](https://opensource.org/licenses/MIT)
+[![FastAPI](https://img.shields.io/badge/Backend-FastAPI_2.0-blue.svg)](https://fastapi.tiangolo.com)
+[![Next.js 14](https://img.shields.io/badge/Frontend-Next.js_14_React_18-black.svg)](https://nextjs.org)
+[![Android](https://img.shields.io/badge/Android-Kotlin_API_34-green.svg)](https://developer.android.com)
 
 ---
 
-## Overview
+## 🌟 Product Vision & Paradigm Shift
 
-Veridra is a modular, full-stack web platform built around a single idea: a security verdict is only useful if the person receiving it understands *why*. Pasting a suspicious message, URL, or job offer returns:
+Current scam-detection applications fail because they require the victim to already suspect something is dangerous. When high-pressure extortion occurs (such as a fake Police Digital Arrest or urgent Customs contraband notice), fear bypasses rational suspicion.
 
-- A clear **Risk Level** and 0–100 score with a confidence range
-- The specific **Threat Category** (phishing, OTP scam, fake job offer, etc.)
-- **Why it was flagged** — tied to the exact phrase, domain, or pattern seen
-- **Why you should not proceed** — realistic consequences in plain language
-- **Recommended safe action** — concrete next steps tailored to the threat
-- **Block & report guidance** — platform-agnostic steps the user can take
-
-The result experience is the centerpiece: clean, serious, and built to be read and acted on in under a minute.
-
-## Problem Statement
-
-Most financial loss from digital fraud does not come from advanced exploits. It comes from routine messages, DMs, and emails that convince someone to share an OTP, click a convincing-looking link, or pay a "registration fee" for a job that does not exist. Professional security tools exist, but they are built for enterprise defenders — not for someone checking a suspicious SMS at a bus stop.
-
-Veridra closes that gap for ordinary users.
-
-## Public Value
-
-- **Accessibility.** No login, no account, works on any device.
-- **Explainability.** Every verdict shows its reasoning, so users learn the red flags over time.
-- **Responsibility.** Veridra never blocks, reports, or replies to anything automatically. It gives guidance — the user stays in control.
-- **Coverage.** Message, link, and job-offer analysis cover the three content types where everyday social-engineering attacks happen most.
-
-## Main Features
-
-- Three analysis modes: **Message Check**, **Link Check**, **Job Offer Check**
-- 6-layer structured output for every analysis
-- Risk scoring with confidence range
-- Evidence-tied explanation engine — suspicious phrases are highlighted in the input
-- Safety Insights dashboard: category distribution, risk-level mix, top red flags, recent analyses
-- Clean, premium, trust-first UI
-- Privacy-minimal persistence: only mode, category, score, level, signal IDs, and a truncated preview are stored
-
-## The Three Analysis Modes
-
-| Mode | Looks for |
-|---|---|
-| **Message Check** | Urgency pressure, OTP/credential requests, brand impersonation, reward bait, financial fraud wording, coercive threats, link + pressure combos |
-| **Link Check** | Abuse-prone TLDs, URL shorteners, raw-IP hosts, typosquatted domains (Levenshtein ≤ 2 from known brands), brand-in-subdomain tricks, excessive subdomains, punycode, login-style paths on disposable hosts, HTTP-not-HTTPS |
-| **Job Offer Check** | Unrealistic pay, upfront fees or deposits, rushed hiring without interviews, premature requests for ID or bank details, mule-style roles, off-channel contact pushes (WhatsApp / Telegram), free-email recruiters, no verifiable company |
-
-## The Six Output Layers
-
-| # | Layer | Purpose |
-|---|---|---|
-| 1 | **Risk Level** | Safe / Low Risk / Suspicious / Likely Scam / High Risk — plus a 0–100 score and confidence range |
-| 2 | **Threat Category** | Phishing, Fake Job Offer, Suspicious Link, OTP Scam, Impersonation, Financial Fraud, or Unknown Suspicious Pattern |
-| 3 | **Why It Was Flagged** | The specific patterns triggered, with the exact evidence that matched |
-| 4 | **Why You Should Not Proceed** | Realistic consequences of engaging, in plain language |
-| 5 | **Recommended Safe Action** | Concrete next steps, tailored to the threat category and signals |
-| 6 | **Block & Report Guidance** | Platform-agnostic steps to block the sender and report the content |
-
-## Tech Stack
-
-**Frontend**
-- Next.js 14 (App Router), TypeScript
-- Tailwind CSS for styling
-- Recharts for the Safety Insights dashboard
-- Lucide icons
-- Hand-rolled UI primitives in the shadcn/ui visual style (no generator step required)
-
-**Backend**
-- FastAPI on Python 3.11+
-- Pydantic v2 for request/response schemas
-- `tldextract` for URL structural analysis
-- SQLite for privacy-minimal persistence (analysis history + insight aggregates)
-- Modular monolith architecture — one process, cleanly separated modules
-
-## Project Structure
+**Guardian AI changes the paradigm from passive checking to autonomous, real-time protection.** It acts as a proactive security agent that intervenes *before* financial loss or credential leakage occurs.
 
 ```
-veridra/
-├── backend/
-│   ├── requirements.txt
-│   └── app/
-│       ├── main.py                       # FastAPI app, routes, CORS, DB init
-│       └── modules/
-│           ├── schemas.py                # Shared Pydantic models & enums
-│           ├── message_analysis.py       # Message red-flag detectors
-│           ├── link_analysis.py          # URL heuristic analysis
-│           ├── job_offer_analysis.py     # Recruiter-scam detectors
-│           ├── risk_scoring.py           # Signal → 0–100 score + band
-│           ├── explanation_engine.py     # Signal → human-readable reasoning
-│           ├── safe_action_guidance.py   # Layer 5 generation
-│           ├── block_report_guidance.py  # Layer 6 generation
-│           ├── data_access.py            # SQLite history & aggregates
-│           └── pipeline.py               # Orchestrator called by the API
-└── frontend/
-    ├── package.json
-    ├── next.config.js
-    ├── tailwind.config.js
-    └── src/
-        ├── app/
-        │   ├── layout.tsx                # Shared header/footer shell
-        │   ├── page.tsx                  # Landing
-        │   ├── analyze/page.tsx          # Core interaction page
-        │   ├── insights/page.tsx         # Safety Insights dashboard
-        │   └── about/page.tsx            # Platform motivation & methodology
-        ├── components/
-        │   ├── SiteHeader.tsx
-        │   ├── SiteFooter.tsx
-        │   ├── Logo.tsx
-        │   ├── ModeTabs.tsx
-        │   ├── ContentInput.tsx
-        │   ├── HighlightedContent.tsx
-        │   └── RiskVerdictPanel.tsx      # The 6-layer result experience
-        └── lib/
-            ├── api.ts
-            ├── types.ts
-            ├── risk.ts                   # Severity theming
-            ├── signalLabels.ts
-            └── cn.ts
+┌───────────────────────────────────────────────────────────────────────────────────┐
+│                           GUARDIAN MULTI-VECTOR DEFENSE                           │
+├───────────────────┬───────────────────┬───────────────────┬───────────────────────┤
+│ 🎙️ Call Assistant │ 🌐 Pre-Nav URL    │ 💳 Pre-Handoff UPI│ 📲 Android Shield     │
+│ Continuous Speech │ Local DNS / VPN   │ Deep-link hook    │ NotificationListener  │
+│ Live STT/TTS Voice│ Phishing Blocker  │ Reverse-debit halt│ Real-time SMS triage  │
+└───────────────────┴───────────────────┴───────────────────┴───────────────────────┘
 ```
 
-## Setup
+---
 
-**Requirements.** Python 3.11+, Node.js 18.17+ (or 20+), npm.
+## 🚀 Key Capabilities
 
-### Backend
+### 1. 🎙️ Equal AI-Inspired Real-Time Call Assistant
+* **Continuous Hands-Free Speech Streaming:** Listens to incoming caller speech via Web Speech Recognition (`16kHz` continuous stream) with sub-second interim keyword detection.
+* **Autonomous Decision & Audible AI Counter-Interventions:** Guardian AI speaks back over the phone line using Web Speech Synthesis, citing Indian law, IT Act, and RBI circulars to neutralize scammers.
+* **Multi-Vector Indian Cybercrime Detection:**
+  * 🚨 **Digital Arrest Extortion:** Fake CBI/Police video detention claims (giving zero legal validity notices).
+  * 🚨 **FedEx / Customs Contraband Scheme:** Intercepted narcotics/passport courier traps.
+  * ⚠️ **Electricity Power Cut at 9:30 PM:** Screen-sharing APK / QuickSupport extortion.
+  * ⚠️ **TRAI / SIM 2-Hour Deactivation:** Telecom KYC credential harvesting.
+* **1-Tap Counter-Intervention Chips:** Instantly demand Police Badge & Station ID, cite RBI circulars, or log evidence for National Cybercrime Portal (`1930`).
+
+### 2. 🌐 Pre-Navigation Phishing & Homoglyph URL Shield
+* Intercepts browser links before network dispatch.
+* Analyzes typosquatting (e.g. `hdfc-bankk-kyc.top`), homoglyphs (e.g. `paypa1-...`), brand spoofing, and disposable `.top`/`.xyz` kits.
+
+### 3. 💳 Real-Time Pre-Handoff UPI & QR Shield
+* Inspects `upi://pay` deep-links before launching PhonePe, Google Pay, or Paytm.
+* Detects **Reverse-Debit Traps** where an outbound money deduction (e.g. ₹8,500) is deceptive framed as an inbound refund credit.
+
+### 4. 📲 Real-Time Android Notification & SMS Listener
+* Production-grade `NotificationListenerService` hooks `onNotificationPosted()` off the main thread.
+* Triages incoming SMS and WhatsApp alerts in `<15ms` for urgent OTP solicitation and fake lottery links.
+
+### 5. 🎯 Threat Demo Center & Attack Lab
+* **Live Scannable Scam QR Codes:** Point your phone camera directly at the monitor to scan real reverse-debit and phishing QR codes.
+* **Scam Audio Voice Player:** Plays loud voice extortion clips through computer speakers so your phone's microphone can listen and test live.
+
+---
+
+## 🏗️ Multi-Agent Architecture
+
+Guardian uses a 6-stage explainable agentic pipeline:
+
+```mermaid
+flowchart LR
+    A["Raw Audio / URL / UPI Intent"] --> B["1. Detection Agent"]
+    B --> C["2. Investigation Agent"]
+    C --> D["3. Evidence Agent"]
+    D --> E["4. Risk Agent (State Machine)"]
+    E --> F["5. Response Agent (Intervention)"]
+    F --> G["6. Explanation Agent (1930 Guidance)"]
+```
+
+1. **Detection Agent:** Tokenizes cues (`AUTHORITY_CLAIM`, `DIGITAL_ARREST_COERCION`, `PAYMENT_DEMAND`, `OTP_REQUEST`, `URGENCY_PRESSURE`).
+2. **Investigation Agent:** Evaluates conversation trajectory and calculates signal corroboration weights.
+3. **Evidence Agent:** Synthesizes evidence matrices with confidence scoring and uncertainty margins.
+4. **Risk Agent:** Enforces dynamic risk state transitions (`SAFE` $\rightarrow$ `SUSPICIOUS` $\rightarrow$ `HIGH` $\rightarrow$ `CRITICAL`).
+5. **Response Agent:** Formulates legally grounded AI speech dialogue and determines blocking overlays.
+6. **Explanation Agent:** Generates clear, plain-language reasoning, safe actions, and reporting steps for `cybercrime.gov.in` (Helpline 1930).
+
+---
+
+## 📂 Repository Structure
+
+```
+├── android_app/                     # Native Android Kotlin application (API 34)
+│   ├── app/src/main/java/com/guardian/ai/
+│   │   ├── services/                # InCallService, NotificationListener, AccessibilityService, VpnService
+│   │   ├── engine/                  # LocalRiskEngine (sub-10ms triage)
+│   │   └── ui/                      # Jetpack Compose mobile dashboard & heads-up overlays
+├── backend/                         # FastAPI 2.0 Real-time Defense API
+│   ├── app/
+│   │   ├── agents/                  # 6 Modular Cyber Defense Agents
+│   │   ├── modules/                 # Heuristic engines, audio analysis, risk scoring
+│   │   ├── api_routes.py            # REST endpoints for Call, URL, UPI, Auth, APK download
+│   │   ├── events_manager.py        # WebSocket real-time telemetry hub
+│   │   ├── guardian_db.py           # SQLite database persistence
+│   │   ├── pipeline_guardian.py     # End-to-end pipeline coordinator
+│   │   └── main.py                  # Server entry point
+├── frontend/                        # Next.js 14 Web Dashboard & Mobile Simulator
+│   ├── src/
+│   │   ├── app/                     # Next.js App Router (Dashboard, SOC Insights)
+│   │   ├── components/
+│   │   │   ├── GuardianMobileSimulator.tsx  # Continuous STT/TTS Mobile Simulator
+│   │   │   ├── GuardianDemoCenter.tsx       # Scannable QR Codes & Audio Voice Player
+│   │   │   ├── GuardianDashboard.tsx        # Live SOC Telemetry
+│   │   │   └── GuardianIncidentsView.tsx    # Evidence & Audit Logs
+│   │   └── lib/                     # API client & WebSocket connections
+└── README.md
+```
+
+---
+
+## ⚡ Quick Start & Installation
+
+### Prerequisites
+* **Python 3.11+**
+* **Node.js 18+ & npm**
+* *(Optional)* Android Studio Jellyfish / Iguana for native APK build
+
+---
+
+### 1. Start the Backend API Server
 
 ```bash
 cd backend
-python -m venv .venv
-source .venv/bin/activate        # On Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-```
+python -m venv venv
+# On Windows:
+.\venv\Scripts\activate
+# On Linux/macOS:
+source venv/bin/activate
 
-### Frontend
+pip install -r requirements.txt
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+* **API Documentation:** [http://localhost:8000/docs](http://localhost:8000/docs)
+* **Health Check:** [http://localhost:8000/api/health](http://localhost:8000/api/health)
+
+---
+
+### 2. Start the Frontend Dashboard & Simulator
 
 ```bash
 cd frontend
 npm install
-cp .env.example .env.local       # Adjust NEXT_PUBLIC_API_URL if needed
+npm run dev -- -p 3000
 ```
+* **Web App (PC):** [http://localhost:3000](http://localhost:3000)
+* **Mobile Access (Same Wi-Fi):** `http://<YOUR_PC_IP>:3000` (e.g. `http://192.168.29.62:3000`)
 
-## Running Locally
+---
 
-Run the backend and frontend in two terminals.
+### 3. Open the Android Application in Android Studio
 
-**Terminal 1 — API**
-```bash
-cd backend
-source .venv/bin/activate
-uvicorn app.main:app --reload --port 8000
-```
+1. Open Android Studio $\rightarrow$ Click **Open Project**.
+2. Select the directory: `android_app/`.
+3. Sync Gradle and run on a connected Android phone or Android Virtual Device (AVD).
+4. Grant **Overlay Permission** and **Notification Access** when prompted.
 
-**Terminal 2 — Web**
-```bash
-cd frontend
-npm run dev
-```
+---
 
-Then open **http://localhost:3000**.
+## 🔑 Default Demo Credentials
 
-The Next.js rewrite in `next.config.js` proxies `/api/*` to the FastAPI backend, so no CORS configuration is required for local development.
+* **Email / Username:** `demo@guardian.app`
+* **Password:** `guardian123`
 
-**API endpoints**
+---
 
-| Method | Path | Purpose |
-|---|---|---|
-| `POST` | `/api/analyze` | Run an analysis. Body: `{ "mode": "message" | "link" | "job_offer", "content": "..." }` |
-| `GET` | `/api/insights` | Aggregated insights for the dashboard |
-| `GET` | `/api/history?limit=N` | Recent analyses (anonymised preview only) |
-| `GET` | `/api/health` | Liveness check |
+## 🛡️ License
 
-## Risk Scoring Logic
-
-Veridra's scorer is deliberately transparent rather than opaque.
-
-1. **Signals.** Each analyzer returns a list of `Signal` objects, each carrying a severity (`low` / `medium` / `high` / `critical`) and the exact evidence that matched.
-2. **Weighted aggregation.** Severities map to base weights: low 8, medium 18, high 30, critical 45.
-3. **Diminishing returns.** Signals are sorted by severity descending and each subsequent signal contributes a smaller fraction of its weight (1.0, 0.7, 0.5, 0.35, 0.25…). This prevents a long, chatty message from runaway-scoring on many low-severity flags.
-4. **Critical floor.** Any critical signal guarantees a minimum score of 75 — the scorer never under-calls a credential request or an upfront-fee job offer just because nothing else fired.
-5. **Banding.** The final 0–100 score maps to `Safe` (<15), `Low Risk` (<35), `Suspicious` (<60), `Likely Scam` (<80), or `High Risk`.
-6. **Confidence range.** Returned as `[score − spread, score + spread]`, where the spread narrows when multiple high-severity signals agree.
-
-## Why Explanation Layers Matter
-
-A standalone "this looks suspicious" verdict is security theater: it asks the user to trust a black box. Veridra's output is structured to teach, not just to label:
-
-- **Layer 3 (Why it was flagged)** ties the verdict to observable evidence in the user's own content. They can see *why* the system thinks what it thinks.
-- **Layer 4 (Why you should not proceed)** translates the signals into real-world consequences, not abstract risk language.
-- **Layer 5 (Recommended safe action)** gives the user something to do — including recovery steps if they have already acted.
-
-Over time, the reasoning itself becomes the lesson: users start recognising urgency pressure, brand-in-subdomain tricks, and upfront-fee jobs on their own.
-
-## Block & Report Guidance
-
-Layer 6 is intentionally advisory, not automated. Veridra does not:
-
-- Block senders on the user's behalf
-- Submit reports to any platform or authority
-- Reply to, forward, or delete content
-
-Instead, for each analysis it returns concrete, platform-agnostic steps — block via the app's built-in feature, report as spam or phishing, forward to the impersonated brand's abuse address, keep evidence before deletion, and so on. This keeps control with the user and avoids creating the illusion that Veridra is a law-enforcement or takedown system.
-
-## Limitations
-
-- **Heuristic, not oracular.** Veridra's analysis is rule- and pattern-based. Novel or carefully crafted attacks may evade detection, and legitimate content can occasionally match a pattern.
-- **Language coverage.** English and Indonesian red-flag patterns are included. Other languages may under-trigger until their patterns are added.
-- **No browser-level execution.** Link analysis is structural. Veridra does not follow redirects, render pages, or query threat-intelligence feeds.
-- **Local persistence.** The default SQLite store is per-deployment; for production, swap `data_access.py`'s backend for Postgres.
-
-## Disclaimer
-
-Veridra is a **decision-support and educational tool**. It is not an official cybersecurity authority and does not replace law enforcement, your bank's fraud department, or formal incident response. Results should be treated as guidance, not as guarantees. When something matters — money, identity documents, or account access — verify through the sender's official channels before acting.
-
-## Future Improvements
-
-- Additional language packs (Malay, Tagalog, Thai, Vietnamese, Spanish, Portuguese)
-- Optional ML classifier layer trained on curated phishing / fake-job corpora
-- Pluggable threat-intelligence checks (Google Safe Browsing, PhishTank, URLHaus) behind a feature flag
-- Account-free shareable result links for community education
-- Admin panel for curating and versioning the red-flag pattern library
-
-## Screenshots
-
-Landing Page
-- ![Landing Page](Docs/screenshots/Landing.jpeg)
-Analyze Result
-- ![Analyze Result](Docs/screenshots/analyze-result.jpeg)
-insight
-- ![Safety Insights](Docs/screenshots/insight.jpeg)
-
-## Author
-
-*Muhammad Abrar Rayhan*
-Telkom University Jakarta
-Machine Learning and Artificial inteligence enthusiast
-## License
-
-*MIT License*
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.

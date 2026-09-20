@@ -37,3 +37,19 @@ export async function fetchHistory(limit = 20): Promise<HistoryItem[]> {
   if (!res.ok) throw new Error("Failed to load history");
   return res.json();
 }
+
+export async function analyzeAudio(audioBlob: Blob): Promise<AnalysisResult> {
+  const formData = new FormData();
+  formData.append("file", audioBlob, "audio.wav");
+
+  const res = await fetch(`${BASE}/api/analyze-audio`, {
+    method: "POST",
+    body: formData,
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => res.statusText);
+    throw new Error(`Voice Analysis failed: ${text}`);
+  }
+  return res.json();
+}
+

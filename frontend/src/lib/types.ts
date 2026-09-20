@@ -1,4 +1,4 @@
-export type AnalysisMode = "message" | "link" | "job_offer";
+export type AnalysisMode = "message" | "link" | "job_offer" | "call";
 
 export type RiskLevel =
   | "Safe"

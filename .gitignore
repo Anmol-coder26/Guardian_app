@@ -21,6 +21,15 @@ build/
 .turbo/
 .vercel/
 
+# Android
+.gradle/
+android_app/build/
+android_app/app/build/
+android_app/.gradle/
+local.properties
+*.apk
+!guardian-ai-debug.apk
+
 # Env & editor
 .env
 .env.local

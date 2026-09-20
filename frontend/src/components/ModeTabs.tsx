@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/cn";
 import type { AnalysisMode } from "@/lib/types";
-import { BriefcaseBusiness, Link2, MessageSquareWarning } from "lucide-react";
+import { BriefcaseBusiness, Link2, MessageSquareWarning, PhoneCall } from "lucide-react";
 
 const TABS: { id: AnalysisMode; label: string; icon: React.ReactNode; hint: string }[] = [
   {
@@ -23,6 +23,12 @@ const TABS: { id: AnalysisMode; label: string; icon: React.ReactNode; hint: stri
     icon: <BriefcaseBusiness className="h-4 w-4" />,
     hint: "Recruiter message or posting",
   },
+  {
+    id: "call",
+    label: "Call Check",
+    icon: <PhoneCall className="h-4 w-4" />,
+    hint: "Simulated call / voice check",
+  },
 ];
 
 export function ModeTabs({
@@ -36,7 +42,7 @@ export function ModeTabs({
     <div
       role="tablist"
       aria-label="Select analysis mode"
-      className="grid grid-cols-1 gap-2 rounded-2xl border border-ink-200 bg-white p-2 shadow-soft sm:grid-cols-3"
+      className="grid grid-cols-1 gap-2 rounded-2xl border border-ink-200 bg-white p-2 shadow-soft sm:grid-cols-4"
     >
       {TABS.map((t) => {
         const active = value === t.id;

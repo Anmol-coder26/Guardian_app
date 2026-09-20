@@ -17,6 +17,7 @@ class AnalysisMode(str, Enum):
     MESSAGE = "message"
     LINK = "link"
     JOB_OFFER = "job_offer"
+    CALL = "call"
 
 
 class RiskLevel(str, Enum):

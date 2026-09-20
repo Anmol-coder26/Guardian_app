@@ -17,6 +17,7 @@ from .explanation_engine import (
 from .job_offer_analysis import analyze_job_offer
 from .link_analysis import analyze_link
 from .message_analysis import analyze_message
+from .llm_analysis import analyze_content_with_llm
 from .risk_scoring import score_signals
 from .safe_action_guidance import build_safe_actions
 from .schemas import (
@@ -29,14 +30,24 @@ from .schemas import (
 
 
 def run_analysis(req: AnalysisRequest) -> AnalysisResult:
-    if req.mode == AnalysisMode.MESSAGE:
-        signals, category = analyze_message(req.content)
-    elif req.mode == AnalysisMode.LINK:
-        signals, category = analyze_link(req.content)
-    elif req.mode == AnalysisMode.JOB_OFFER:
-        signals, category = analyze_job_offer(req.content)
+    # Try contextual LLM analysis first (Phase 1)
+    llm_result = analyze_content_with_llm(req.mode, req.content)
+
+    if llm_result is not None:
+        signals, category = llm_result
     else:
-        raise ValueError(f"Unsupported mode: {req.mode}")
+        # Fallback to local rules-based engine
+        if req.mode == AnalysisMode.MESSAGE:
+            signals, category = analyze_message(req.content)
+        elif req.mode == AnalysisMode.LINK:
+            signals, category = analyze_link(req.content)
+        elif req.mode == AnalysisMode.JOB_OFFER:
+            signals, category = analyze_job_offer(req.content)
+        elif req.mode == AnalysisMode.CALL:
+            # Fallback for text-pasted call transcripts: run message-based check
+            signals, category = analyze_message(req.content)
+        else:
+            raise ValueError(f"Unsupported mode: {req.mode}")
 
     score, level, (conf_low, conf_high) = score_signals(signals)
 

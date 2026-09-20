@@ -929,9 +929,30 @@ async def dispatch_dpdp_notice(request_id: str):
     return record.dict()
 
 
+@router.post("/guardian/dpdp/add-custom-target")
+def add_custom_target_fiduciary(data: dict):
+    """Adds a user-specified custom company/broker target to the DPDP opt-out registry."""
+    company_name = data.get("company_name", "").strip()
+    dpo_email = data.get("dpo_email", "").strip()
+    category = data.get("category", "CUSTOM_USER_TARGET")
+    desc = data.get("data_held_description", "User-maintained custom opt-out target")
+
+    if not company_name or not dpo_email:
+        raise HTTPException(status_code=400, detail="Company name and DPO email are required")
+
+    target = DpdpOptOutManager.add_custom_fiduciary(
+        company_name=company_name,
+        dpo_email=dpo_email,
+        category=category,
+        data_held_description=desc,
+    )
+    return target.dict()
+
+
 @router.get("/guardian/dpdp/requests")
 def list_dpdp_requests():
     """Returns all statutory DPDP Act 2023 erasure requests and compliance statuses."""
     return [r.dict() for r in DpdpOptOutManager.list_requests()]
+
 
 

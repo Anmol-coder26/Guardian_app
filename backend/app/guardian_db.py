@@ -196,6 +196,36 @@ def init_guardian_db() -> None:
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
         FOREIGN KEY (call_session_id) REFERENCES call_sessions(id) ON DELETE SET NULL
     );
+
+    CREATE TABLE IF NOT EXISTS dpdp_custom_fiduciaries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        company_name TEXT NOT NULL,
+        category TEXT NOT NULL,
+        dpo_email TEXT NOT NULL,
+        data_held_description TEXT,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS dpdp_erasure_requests (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        request_id TEXT UNIQUE NOT NULL,
+        company_name TEXT NOT NULL,
+        dpo_email TEXT NOT NULL,
+        user_name TEXT NOT NULL,
+        user_phone TEXT NOT NULL,
+        user_email TEXT NOT NULL,
+        statutory_basis TEXT NOT NULL,
+        notice_body TEXT NOT NULL,
+        status TEXT NOT NULL, -- DRAFTED, DISPATCHED, COMPLIANCE_PENDING, CONFIRMED_ERASED
+        dispatched_at TEXT,
+        compliance_deadline TEXT,
+        confirmation_reference TEXT,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
     """)
 
     conn.commit()

@@ -104,10 +104,32 @@ class DpdpOptOutManager:
     ]
 
     _erasure_requests: Dict[str, ErasureRequestRecord] = {}
+    _custom_fiduciaries: List[DataFiduciaryTarget] = []
 
     @classmethod
     def list_fiduciaries(cls) -> List[DataFiduciaryTarget]:
-        return cls.DATA_FIDUCIARIES
+        return cls.DATA_FIDUCIARIES + cls._custom_fiduciaries
+
+    @classmethod
+    def add_custom_fiduciary(
+        cls,
+        company_name: str,
+        dpo_email: str,
+        category: str = "CUSTOM_TARGET",
+        data_held_description: str = "User specified company/broker"
+    ) -> DataFiduciaryTarget:
+        target = DataFiduciaryTarget(
+            id=f"custom_{int(time.time())}_{uuid.uuid4().hex[:4]}",
+            company_name=company_name.strip(),
+            category=category,
+            dpo_email=dpo_email.strip(),
+            jurisdiction="India (DPDP Act 2023)",
+            data_held_description=data_held_description,
+            estimated_records="Custom User Target",
+            avg_compliance_days=15
+        )
+        cls._custom_fiduciaries.append(target)
+        return target
 
     @classmethod
     def generate_erasure_notice(
@@ -117,7 +139,8 @@ class DpdpOptOutManager:
         user_phone: str = "+91 98765 43210",
         user_email: str = "alex.sharma@example.com"
     ) -> ErasureRequestRecord:
-        fiduciary = next((f for f in cls.DATA_FIDUCIARIES if f.id == fiduciary_id), cls.DATA_FIDUCIARIES[0])
+        all_fiduciaries = cls.list_fiduciaries()
+        fiduciary = next((f for f in all_fiduciaries if f.id == fiduciary_id), all_fiduciaries[0])
         request_id = f"DPDP_REQ_{int(time.time())}_{uuid.uuid4().hex[:6].upper()}"
 
         notice_body = f"""FORMAL NOTICE FOR ERASURE OF PERSONAL DATA

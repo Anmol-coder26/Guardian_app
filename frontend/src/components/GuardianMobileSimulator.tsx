@@ -51,7 +51,7 @@ import {
 import { guardianApi } from '../lib/guardianApi';
 
 interface Props {
-  initialSubTab?: 'call' | 'url' | 'upi' | 'notifications' | 'permissions';
+  initialSubTab?: 'call' | 'url' | 'upi' | 'notifications' | 'digital_arrest' | 'dpdp_optout' | 'permissions';
   onIncidentCreated?: () => void;
   onSelectIncident?: (id: number) => void;
 }
@@ -61,7 +61,14 @@ export const GuardianMobileSimulator: React.FC<Props> = ({
   onIncidentCreated,
   onSelectIncident,
 }) => {
-  const [subTab, setSubTab] = useState<'call' | 'url' | 'upi' | 'notifications' | 'permissions'>(initialSubTab);
+  const [subTab, setSubTab] = useState<'call' | 'url' | 'upi' | 'notifications' | 'digital_arrest' | 'dpdp_optout' | 'permissions'>(initialSubTab);
+
+  // Digital Arrest & DPDP Opt-Out State
+  const [digitalArrestEvidenceReport, setDigitalArrestEvidenceReport] = useState<any>(null);
+  const [isCapturingFrames, setIsCapturingFrames] = useState(false);
+  const [dpdpFiduciariesList, setDpdpFiduciariesList] = useState<any[]>([]);
+  const [activeDpdpNotice, setActiveDpdpNotice] = useState<any>(null);
+  const [dispatchedDpdpRequests, setDispatchedDpdpRequests] = useState<any[]>([]);
 
   useEffect(() => {
     if (initialSubTab) setSubTab(initialSubTab);
@@ -1110,65 +1117,95 @@ export const GuardianMobileSimulator: React.FC<Props> = ({
           </p>
 
           {/* Sub Tab Switcher */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 pt-2">
             <button
               onClick={() => setSubTab('call')}
-              className={`flex flex-col items-center gap-1.5 rounded-xl border p-2.5 text-xs font-medium transition-all ${
+              className={`flex flex-col items-center gap-1.5 rounded-xl border p-2 text-xs font-medium transition-all ${
                 subTab === 'call'
                   ? 'border-emerald-500 bg-emerald-500/10 text-emerald-300 shadow-sm'
                   : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
               }`}
             >
-              <PhoneCall className="h-4 w-4" />
+              <PhoneCall className="h-3.5 w-3.5" />
               <span>1. Call AI</span>
             </button>
 
             <button
               onClick={() => setSubTab('url')}
-              className={`flex flex-col items-center gap-1.5 rounded-xl border p-2.5 text-xs font-medium transition-all ${
+              className={`flex flex-col items-center gap-1.5 rounded-xl border p-2 text-xs font-medium transition-all ${
                 subTab === 'url'
                   ? 'border-cyan-500 bg-cyan-500/10 text-cyan-300 shadow-sm'
                   : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
               }`}
             >
-              <Globe className="h-4 w-4" />
+              <Globe className="h-3.5 w-3.5" />
               <span>2. URL Shield</span>
             </button>
 
             <button
               onClick={() => setSubTab('upi')}
-              className={`flex flex-col items-center gap-1.5 rounded-xl border p-2.5 text-xs font-medium transition-all ${
+              className={`flex flex-col items-center gap-1.5 rounded-xl border p-2 text-xs font-medium transition-all ${
                 subTab === 'upi'
                   ? 'border-amber-500 bg-amber-500/10 text-amber-300 shadow-sm'
                   : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
               }`}
             >
-              <CreditCard className="h-4 w-4" />
+              <CreditCard className="h-3.5 w-3.5" />
               <span>3. UPI Shield</span>
             </button>
 
             <button
               onClick={() => setSubTab('notifications')}
-              className={`flex flex-col items-center gap-1.5 rounded-xl border p-2.5 text-xs font-medium transition-all ${
+              className={`flex flex-col items-center gap-1.5 rounded-xl border p-2 text-xs font-medium transition-all ${
                 subTab === 'notifications'
                   ? 'border-rose-500 bg-rose-500/10 text-rose-300 shadow-sm'
                   : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
               }`}
             >
-              <Bell className="h-4 w-4" />
-              <span>4. SMS Shield</span>
+              <Bell className="h-3.5 w-3.5" />
+              <span>4. SMS Guard</span>
+            </button>
+
+            <button
+              onClick={() => setSubTab('digital_arrest')}
+              className={`flex flex-col items-center gap-1.5 rounded-xl border p-2 text-xs font-medium transition-all ${
+                subTab === 'digital_arrest'
+                  ? 'border-rose-600 bg-rose-600/20 text-rose-200 shadow-sm'
+                  : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+              }`}
+            >
+              <ShieldAlert className="h-3.5 w-3.5 text-rose-400" />
+              <span>5. Digital Arrest</span>
+            </button>
+
+            <button
+              onClick={async () => {
+                setSubTab('dpdp_optout');
+                try {
+                  const fids = await guardianApi.listDpdpFiduciaries();
+                  setDpdpFiduciariesList(fids);
+                } catch {}
+              }}
+              className={`flex flex-col items-center gap-1.5 rounded-xl border p-2 text-xs font-medium transition-all ${
+                subTab === 'dpdp_optout'
+                  ? 'border-indigo-500 bg-indigo-500/20 text-indigo-200 shadow-sm'
+                  : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+              }`}
+            >
+              <Fingerprint className="h-3.5 w-3.5 text-indigo-400" />
+              <span>6. DPDP Erasure</span>
             </button>
 
             <button
               onClick={() => setSubTab('permissions')}
-              className={`flex flex-col items-center gap-1.5 rounded-xl border p-2.5 text-xs font-medium transition-all ${
+              className={`flex flex-col items-center gap-1.5 rounded-xl border p-2 text-xs font-medium transition-all ${
                 subTab === 'permissions'
                   ? 'border-purple-500 bg-purple-500/10 text-purple-300 shadow-sm'
                   : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
               }`}
             >
-              <Lock className="h-4 w-4" />
-              <span>5. Status</span>
+              <Lock className="h-3.5 w-3.5" />
+              <span>7. Status</span>
             </button>
           </div>
         </div>
@@ -1636,7 +1673,181 @@ export const GuardianMobileSimulator: React.FC<Props> = ({
           </div>
         )}
 
-        {/* TAB 5: PERMISSIONS */}
+        {/* TAB 5: DIGITAL ARREST DEFENSE & CYBERCRIME PREFILL */}
+        {subTab === 'digital_arrest' && (
+          <div className="rounded-2xl border border-rose-500/40 bg-slate-900/90 p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                <ShieldAlert className="h-4 w-4 text-rose-400" />
+                <span>Digital Arrest Video Call Defender & 1930 Portal</span>
+              </h3>
+              <span className="rounded bg-rose-500/20 px-2 py-0.5 text-[10px] font-mono font-bold text-rose-400 border border-rose-500/30">
+                MEDIA PROJECTION READY
+              </span>
+            </div>
+            <p className="text-xs text-slate-400">
+              When fraudsters coerce victims on fake police/CBI Skype or WhatsApp video calls, Guardian uses Android <code className="text-cyan-400 font-mono">MediaProjection API</code> to cryptographically hash video frames and generates a 1-click complaint dossier for <code className="text-emerald-400 font-mono">cybercrime.gov.in</code>.
+            </p>
+
+            <div className="space-y-3 pt-2">
+              <button
+                onClick={async () => {
+                  setIsCapturingFrames(true);
+                  try {
+                    const report = await guardianApi.captureDigitalArrestEvidence({
+                      call_id: `VIDEO_CALL_${Date.now()}`,
+                      suspect_name: 'Officer Rathore (Fake CBI Cyber Cell)',
+                      department: 'Central Bureau of Investigation (HQ Delhi)',
+                      platform: 'Skype Video Call',
+                      transcript_turns: [
+                        { speaker: 'FAKE_OFFICER', text: 'You are under 24-hour Digital Arrest. Do not disconnect this Skype video call.' },
+                        { speaker: 'FAKE_OFFICER', text: 'Your Aadhaar is flagged in ₹3.8 Crore money laundering. Transfer ₹50,000 security bond now.' }
+                      ],
+                      loss_amount_demanded: 50000.0,
+                    });
+                    setDigitalArrestEvidenceReport(report);
+                    setIsCapturingFrames(false);
+                    addDecisionLog('detect', `🚨 MediaProjection captured 2 video frames. Cybercrime prefill generated: ${report.report_id}`);
+                  } catch (e) {
+                    console.error(e);
+                    setIsCapturingFrames(false);
+                  }
+                }}
+                disabled={isCapturingFrames}
+                className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-rose-600 to-red-700 hover:from-rose-500 hover:to-red-600 py-3 text-xs font-bold text-white shadow-lg shadow-rose-600/30 active:scale-95 disabled:opacity-50"
+              >
+                <RadioTower className="h-4 w-4 animate-pulse" />
+                <span>{isCapturingFrames ? 'Capturing MediaProjection Frames...' : '📸 Simulate Fake Police Call & Capture Evidence'}</span>
+              </button>
+
+              {digitalArrestEvidenceReport && (
+                <div className="rounded-xl border border-rose-500/50 bg-slate-950 p-4 space-y-3 text-xs">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <span className="font-mono text-emerald-400 font-bold">CASE: {digitalArrestEvidenceReport.report_id}</span>
+                    <span className="bg-rose-500/20 text-rose-300 font-mono text-[9px] px-2 py-0.5 rounded">
+                      SHA256 SIGNED
+                    </span>
+                  </div>
+
+                  <div className="space-y-1 text-[11px] text-slate-300">
+                    <div><strong>Accused:</strong> {digitalArrestEvidenceReport.suspect_name_claimed} ({digitalArrestEvidenceReport.suspect_department})</div>
+                    <div><strong>Demands:</strong> ₹{digitalArrestEvidenceReport.prefill_form?.approximate_loss_inr?.toLocaleString()} Security Bond / Extortion</div>
+                    <div><strong>Evidence Captured:</strong> 2 Video Frames + Full ASR Transcript</div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <a
+                      href="https://cybercrime.gov.in"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center justify-center gap-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 py-2 text-xs font-bold text-white text-center"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      <span>Pre-Fill on cybercrime.gov.in</span>
+                    </a>
+                    <a
+                      href="tel:1930"
+                      className="flex items-center justify-center gap-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 py-2 text-xs font-bold text-white text-center"
+                    >
+                      <PhoneCall className="h-3.5 w-3.5" />
+                      <span>Dial 1930 Helpline</span>
+                    </a>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 6: INDIA DPDP ACT 2023 DATA BROKER OPT-OUT */}
+        {subTab === 'dpdp_optout' && (
+          <div className="rounded-2xl border border-indigo-500/40 bg-slate-900/90 p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                <Fingerprint className="h-4 w-4 text-indigo-400" />
+                <span>India DPDP Act 2023 Data Erasure Automation</span>
+              </h3>
+              <span className="rounded bg-indigo-500/20 px-2 py-0.5 text-[10px] font-mono font-bold text-indigo-300 border border-indigo-500/30">
+                SECTION 12(3) STATUTORY
+              </span>
+            </div>
+            <p className="text-xs text-slate-400">
+              Exercising your statutory right to erasure under <strong>India&apos;s Digital Personal Data Protection Act, 2023</strong> (not US CCPA). Dispatches binding legal erasure notices to Indian data fiduciaries, credit aggregators, and telemarketers.
+            </p>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-mono text-slate-400 uppercase">SELECT DATA BROKER / FIDUCIARY IN INDIA:</label>
+              <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                {(dpdpFiduciariesList.length > 0 ? dpdpFiduciariesList : [
+                  { id: 'fid_truecaller', company_name: 'Truecaller India Pvt Ltd', category: 'CALLER_ID_DIRECTORY', dpo_email: 'dpo@truecaller.com' },
+                  { id: 'fid_justdial', company_name: 'JustDial Telemarketing Services', category: 'MARKETING_BROKER', dpo_email: 'privacy@justdial.com' },
+                  { id: 'fid_paisabazaar', company_name: 'Paisabazaar & PolicyBazaar', category: 'LOAN_AGGREGATOR', dpo_email: 'grievance@paisabazaar.com' },
+                  { id: 'fid_crif_highmark', company_name: 'CRIF High Mark Marketing Partners', category: 'CREDIT_BUREAU', dpo_email: 'nodal.officer@crifhighmark.com' }
+                ]).map((fid: any) => (
+                  <div
+                    key={fid.id}
+                    className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950 p-3 text-xs"
+                  >
+                    <div>
+                      <div className="font-bold text-white">{fid.company_name}</div>
+                      <div className="text-[10px] text-slate-400 font-mono">{fid.dpo_email} • {fid.category}</div>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        try {
+                          const notice = await guardianApi.generateDpdpNotice({
+                            fiduciary_id: fid.id,
+                            user_name: 'Alex Sharma',
+                            user_phone: '+91 98765 43210',
+                            user_email: 'alex.sharma@example.com',
+                          });
+                          setActiveDpdpNotice(notice);
+                          addDecisionLog('decision', `🇮🇳 Generated DPDP Act 2023 Section 12(3) Erasure Notice for ${fid.company_name}`);
+                        } catch (e) {
+                          console.error(e);
+                        }
+                      }}
+                      className="rounded-lg bg-indigo-600 hover:bg-indigo-500 px-3 py-1.5 text-[11px] font-bold text-white shadow-sm"
+                    >
+                      Generate Notice
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {activeDpdpNotice && (
+              <div className="rounded-xl border border-indigo-500/50 bg-slate-950 p-4 space-y-3 text-xs">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                  <span className="font-mono text-indigo-300 font-bold">NOTICE: {activeDpdpNotice.request_id}</span>
+                  <span className="bg-indigo-500/20 text-indigo-300 font-mono text-[9px] px-2 py-0.5 rounded">
+                    DPDP ACT 2023 (INDIA)
+                  </span>
+                </div>
+                <div className="rounded-lg bg-slate-900 p-2 text-[10px] font-mono text-slate-300 max-h-32 overflow-y-auto whitespace-pre-wrap border border-slate-800">
+                  {activeDpdpNotice.generated_notice_body}
+                </div>
+                <button
+                  onClick={async () => {
+                    try {
+                      const res = await guardianApi.dispatchDpdpNotice(activeDpdpNotice.request_id);
+                      setActiveDpdpNotice(res);
+                      setDispatchedDpdpRequests((prev) => [res, ...prev]);
+                      addDecisionLog('decision', `✉️ Dispatched statutory DPDP notice to ${res.dpo_email}. 30-day compliance deadline: ${res.compliance_deadline}`);
+                    } catch (e) {
+                      console.error(e);
+                    }
+                  }}
+                  className="w-full rounded-xl bg-emerald-600 hover:bg-emerald-500 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/20"
+                >
+                  ✉️ Dispatch Statutory Notice to DPO ({activeDpdpNotice.dpo_email})
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 7: PERMISSIONS */}
         {subTab === 'permissions' && (
           <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-6 space-y-4">
             <h3 className="text-sm font-semibold text-white flex items-center gap-2">
@@ -2278,6 +2489,95 @@ export const GuardianMobileSimulator: React.FC<Props> = ({
                         <div className="text-[10px] text-slate-400 line-clamp-1">{n.text}</div>
                       </div>
                     ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ------------------------------------------------------------- */}
+            {/* SCREEN: DIGITAL ARREST DEFENSE HUD */}
+            {/* ------------------------------------------------------------- */}
+            {subTab === 'digital_arrest' && (
+              <div className="flex-1 flex flex-col justify-between space-y-3">
+                <div className="rounded-2xl border border-rose-500/80 bg-gradient-to-b from-rose-950/90 to-black p-4 text-center space-y-3">
+                  <div className="flex items-center justify-between text-[10px] font-mono text-rose-300">
+                    <span>SKYPE VIDEO ENCOUNTER</span>
+                    <span className="rounded bg-rose-500 px-1.5 py-0.5 text-white font-bold animate-pulse">
+                      RECORDING EVIDENCE
+                    </span>
+                  </div>
+
+                  <div className="relative rounded-xl border border-slate-700 bg-slate-900/90 h-36 flex flex-col items-center justify-center overflow-hidden">
+                    <div className="absolute top-2 left-2 flex items-center gap-1 bg-black/60 rounded px-1.5 py-0.5 text-[8px] font-mono text-rose-400">
+                      <RadioTower className="h-2.5 w-2.5 animate-ping text-rose-500" />
+                      <span>MediaProjection Active</span>
+                    </div>
+                    <ShieldAlert className="h-10 w-10 text-rose-500 mb-1" />
+                    <div className="text-xs font-bold text-white">Officer Rathore (Fake CBI)</div>
+                    <div className="text-[10px] text-rose-300 italic">&ldquo;Transfer ₹50,000 bail immediately or face arrest.&rdquo;</div>
+                  </div>
+
+                  <div className="rounded-xl bg-slate-950 p-2.5 text-left text-[9px] font-mono space-y-1 border border-rose-900/50">
+                    <div className="font-bold text-rose-400">1-CLICK CYBERCRIME.GOV.IN PREFILL:</div>
+                    <div className="text-slate-300">Category: Online Extortion / Digital Arrest</div>
+                    <div className="text-slate-300">Evidence: 2 Video Frame SHA256 Hashes Signed</div>
+                    <div className="text-emerald-400">Statutory Violation: IPC 419, 420, 384, IT Act 66D</div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <a
+                      href="https://cybercrime.gov.in"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="rounded-xl bg-indigo-600 hover:bg-indigo-500 py-2 text-[10px] font-bold text-white text-center"
+                    >
+                      Pre-Fill Portal
+                    </a>
+                    <a
+                      href="tel:1930"
+                      className="rounded-xl bg-rose-600 hover:bg-rose-500 py-2 text-[10px] font-bold text-white text-center"
+                    >
+                      Emergency 1930
+                    </a>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ------------------------------------------------------------- */}
+            {/* SCREEN: INDIA DPDP ACT 2023 DATA ERASURE */}
+            {/* ------------------------------------------------------------- */}
+            {subTab === 'dpdp_optout' && (
+              <div className="flex-1 flex flex-col justify-between space-y-3">
+                <div className="space-y-2 text-left">
+                  <div className="flex items-center justify-between text-[10px] font-mono text-slate-400">
+                    <span className="flex items-center gap-1 text-indigo-400 font-bold">
+                      <Fingerprint className="h-3 w-3" />
+                      DPDP ACT 2023 PORTAL
+                    </span>
+                    <span>Section 12(3)</span>
+                  </div>
+
+                  <div className="rounded-2xl border border-indigo-500/40 bg-indigo-950/30 p-3 space-y-2">
+                    <div className="text-xs font-bold text-white">Data Broker Opt-Out Status</div>
+                    <p className="text-[10px] text-slate-300">
+                      Dispatched statutory erasure notices to Indian telemarketing and credit brokers.
+                    </p>
+
+                    <div className="space-y-1 pt-1">
+                      <div className="flex justify-between text-[9px] font-mono text-slate-300 bg-slate-900/80 p-1.5 rounded">
+                        <span>Truecaller India:</span>
+                        <span className="text-emerald-400 font-bold">DISPATCHED (30-Day Clock)</span>
+                      </div>
+                      <div className="flex justify-between text-[9px] font-mono text-slate-300 bg-slate-900/80 p-1.5 rounded">
+                        <span>JustDial Telemarketing:</span>
+                        <span className="text-emerald-400 font-bold">DISPATCHED</span>
+                      </div>
+                      <div className="flex justify-between text-[9px] font-mono text-slate-300 bg-slate-900/80 p-1.5 rounded">
+                        <span>Paisabazaar Leads:</span>
+                        <span className="text-amber-400 font-bold">PENDING COMPLIANCE</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>

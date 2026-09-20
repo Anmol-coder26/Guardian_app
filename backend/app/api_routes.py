@@ -19,6 +19,8 @@ from .pipeline_guardian import GuardianPipeline
 from .events_manager import events_hub
 from .modules.voice_clone_detector import VoiceCloneDetector
 from .modules.sms_scam_classifier import SmsScamClassifier
+from .modules.digital_arrest_evidence import DigitalArrestScamManager
+from .modules.dpdp_optout_manager import DpdpOptOutManager
 
 router = APIRouter()
 
@@ -136,6 +138,22 @@ class PostTriggerActionRequest(BaseModel):
     message_id: str
     event_type: str  # LINK_CLICKED, APP_INSTALLED, REMOTE_TOOL_LAUNCHED, OTP_COPIED
     target_package_or_url: str
+
+
+class CaptureDigitalArrestEvidenceRequest(BaseModel):
+    call_id: str
+    suspect_name: Optional[str] = "Officer Rathore (Fake CBI)"
+    department: Optional[str] = "CBI Cyber Crime Division"
+    platform: Optional[str] = "Skype Video"
+    transcript_turns: List[Dict[str, Any]] = []
+    loss_amount_demanded: Optional[float] = 50000.0
+
+
+class DpdpErasureNoticeRequest(BaseModel):
+    fiduciary_id: str
+    user_name: Optional[str] = "Alex Sharma"
+    user_phone: Optional[str] = "+91 98765 43210"
+    user_email: Optional[str] = "alex.sharma@example.com"
 
 
 # ----------------------------------------------------
@@ -816,4 +834,104 @@ async def log_post_trigger_action(req: PostTriggerActionRequest):
 def get_watchdog_status():
     """Returns active scoped watchdog sessions and captured post-trigger events."""
     return SmsScamClassifier.get_active_watchdog_status()
+
+
+# ----------------------------------------------------
+# FEATURE 3: DIGITAL ARREST EVIDENCE CAPTURE & CYBERCRIME.GOV.IN PRE-FILL
+# ----------------------------------------------------
+
+@router.post("/guardian/digital-arrest/capture-evidence")
+async def capture_digital_arrest_evidence_endpoint(req: CaptureDigitalArrestEvidenceRequest):
+    """
+    Captures structured video/audio evidence (MediaProjection frame hashes, ASR transcript, suspect claims)
+    and formats a complaint pre-fill pack mapped to cybercrime.gov.in.
+    """
+    report = DigitalArrestScamManager.capture_call_evidence(
+        call_id=req.call_id,
+        suspect_name=req.suspect_name or "Officer Rathore (Fake CBI)",
+        department=req.department or "CBI Cyber Crime Division",
+        platform=req.platform or "Skype Video",
+        transcript_turns=req.transcript_turns,
+        raw_screenshots_count=2,
+        loss_amount_demanded=req.loss_amount_demanded or 50000.0,
+    )
+
+    # Broadcast event
+    await events_hub.broadcast({
+        "type": "DIGITAL_ARREST_EVIDENCE_CAPTURED",
+        "report_id": report.report_id,
+        "call_id": report.call_id,
+        "suspect": report.suspect_name_claimed,
+        "prefill_ready": True,
+        "evidence_items_count": len(report.captured_evidence),
+    })
+
+    return report.dict()
+
+
+@router.get("/guardian/digital-arrest/reports")
+def list_digital_arrest_reports():
+    """Returns all captured digital arrest evidence reports."""
+    return [r.dict() for r in DigitalArrestScamManager.list_reports()]
+
+
+@router.get("/guardian/digital-arrest/reports/{report_id}")
+def get_digital_arrest_report_detail(report_id: str):
+    """Returns specific digital arrest evidence dossier and pre-filled cybercrime.gov.in complaint."""
+    report = DigitalArrestScamManager.get_report(report_id)
+    if not report:
+        raise HTTPException(status_code=404, detail="Digital arrest evidence report not found")
+    return report.dict()
+
+
+# ----------------------------------------------------
+# FEATURE 4: INDIA DPDP ACT 2023 DATA BROKER OPT-OUT AUTOMATION
+# ----------------------------------------------------
+
+@router.get("/guardian/dpdp/data-fiduciaries")
+def list_dpdp_fiduciaries():
+    """Returns registry of Indian data fiduciaries, credit aggregators, and caller directories."""
+    return [f.dict() for f in DpdpOptOutManager.list_fiduciaries()]
+
+
+@router.post("/guardian/dpdp/generate-erasure-notice")
+def generate_dpdp_notice(req: DpdpErasureNoticeRequest):
+    """
+    Generates a formal statutory data erasure notice under Section 12(3) of India's DPDP Act 2023.
+    """
+    record = DpdpOptOutManager.generate_erasure_notice(
+        fiduciary_id=req.fiduciary_id,
+        user_name=req.user_name or "Alex Sharma",
+        user_phone=req.user_phone or "+91 98765 43210",
+        user_email=req.user_email or "alex.sharma@example.com",
+    )
+    return record.dict()
+
+
+@router.post("/guardian/dpdp/dispatch-request/{request_id}")
+async def dispatch_dpdp_notice(request_id: str):
+    """
+    Dispatches formal DPDP Act 2023 erasure notice to the target Data Protection Officer.
+    Starts the 30-day statutory compliance countdown timer.
+    """
+    record = DpdpOptOutManager.dispatch_request(request_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="Erasure request not found")
+
+    await events_hub.broadcast({
+        "type": "DPDP_NOTICE_DISPATCHED",
+        "request_id": record.request_id,
+        "company": record.company_name,
+        "dpo_email": record.dpo_email,
+        "compliance_deadline": record.compliance_deadline,
+    })
+
+    return record.dict()
+
+
+@router.get("/guardian/dpdp/requests")
+def list_dpdp_requests():
+    """Returns all statutory DPDP Act 2023 erasure requests and compliance statuses."""
+    return [r.dict() for r in DpdpOptOutManager.list_requests()]
+
 

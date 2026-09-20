@@ -352,6 +352,69 @@ export const guardianApi = {
     return res.json();
   },
 
+  // Feature 3: Digital Arrest Evidence & Cybercrime Prefill
+  async captureDigitalArrestEvidence(data: {
+    call_id: string;
+    suspect_name?: string;
+    department?: string;
+    platform?: string;
+    transcript_turns: any[];
+    loss_amount_demanded?: number;
+  }): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/api/guardian/digital-arrest/capture-evidence`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(data),
+    });
+    return res.json();
+  },
+
+  async listDigitalArrestReports(): Promise<any[]> {
+    const res = await fetch(`${API_BASE_URL}/api/guardian/digital-arrest/reports`, {
+      headers: authHeaders(),
+    });
+    return res.json();
+  },
+
+  async getDigitalArrestReportDetail(reportId: string): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/api/guardian/digital-arrest/reports/${reportId}`, {
+      headers: authHeaders(),
+    });
+    return res.json();
+  },
+
+  // Feature 4: India DPDP Act 2023 Data Broker Opt-Out
+  async listDpdpFiduciaries(): Promise<any[]> {
+    const res = await fetch(`${API_BASE_URL}/api/guardian/dpdp/data-fiduciaries`, {
+      headers: authHeaders(),
+    });
+    return res.json();
+  },
+
+  async generateDpdpNotice(data: { fiduciary_id: string; user_name?: string; user_phone?: string; user_email?: string }): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/api/guardian/dpdp/generate-erasure-notice`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(data),
+    });
+    return res.json();
+  },
+
+  async dispatchDpdpNotice(requestId: string): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/api/guardian/dpdp/dispatch-request/${requestId}`, {
+      method: 'POST',
+      headers: authHeaders(),
+    });
+    return res.json();
+  },
+
+  async listDpdpRequests(): Promise<any[]> {
+    const res = await fetch(`${API_BASE_URL}/api/guardian/dpdp/requests`, {
+      headers: authHeaders(),
+    });
+    return res.json();
+  },
+
   // WebSocket Connection
   createEventsWebSocket(onMessage: (event: SecurityEvent) => void, onStatusChange?: (connected: boolean) => void): WebSocket {
     const ws = new WebSocket(`${WS_BASE_URL}/api/ws/events`);

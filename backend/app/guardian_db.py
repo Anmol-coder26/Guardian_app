@@ -164,6 +164,38 @@ def init_guardian_db() -> None:
         notifications_enabled INTEGER DEFAULT 1,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS emergency_contacts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        contact_name TEXT NOT NULL,
+        relationship TEXT NOT NULL, -- e.g. Mother, Father, Son, Daughter, Spouse
+        phone_number TEXT NOT NULL,
+        is_verified INTEGER DEFAULT 1,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS voice_clone_analyses (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        call_session_id INTEGER,
+        caller_phone TEXT NOT NULL,
+        claimed_identity TEXT,
+        synthetic_probability REAL NOT NULL,
+        risk_level TEXT NOT NULL, -- SAFE, SUSPICIOUS, CRITICAL
+        verdict TEXT NOT NULL, -- SYNTHETIC_VOICE_CLONE, HUMAN_NATURAL_VOICE, SUSPICIOUS_ACOUSTIC_ANOMALY
+        acoustic_features_json TEXT NOT NULL, -- Extracted mathematical features only (never raw audio)
+        detected_artifacts_json TEXT NOT NULL,
+        challenge_prompt TEXT,
+        challenge_status TEXT DEFAULT 'UNTESTED', -- PASSED, FAILED_OR_TIMED_OUT, UNTESTED
+        challenge_latency_ms INTEGER,
+        alert_sent_to_real_contact INTEGER DEFAULT 0,
+        real_contact_notified_phone TEXT,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (call_session_id) REFERENCES call_sessions(id) ON DELETE SET NULL
+    );
     """)
 
     conn.commit()

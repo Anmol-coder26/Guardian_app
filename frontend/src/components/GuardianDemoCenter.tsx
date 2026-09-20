@@ -134,6 +134,26 @@ export const GuardianDemoCenter: React.FC<Props> = ({
   // Audio Voice Scam Clips
   const audioClips = [
     {
+      id: 'audio_voice_clone_kidnap',
+      title: '🚨 AI Voice Clone: Son Kidnapping & Bail Extortion',
+      speaker: 'Cloned Voice (Target: Son Aryan)',
+      duration: '15s',
+      risk: 'CRITICAL (99/100) - AI SYNTHETIC CLONE DETECTED',
+      script:
+        'Mom! Dad! Please help me! I got arrested after a car accident near Delhi border. The police inspector said if you don\'t send ₹50,000 bail right now to this UPI ID, they will put me in jail! Don\'t call anyone, just transfer immediately please!',
+      cues: ['AI_VOICE_CLONE', 'EXTORTION', 'URGENCY_PRESSURE', 'IMPERSONATION'],
+    },
+    {
+      id: 'audio_voice_clone_ceo',
+      title: '🚨 Deepfake Audio: Executive Wire Transfer Authorization',
+      speaker: 'Cloned Voice (CEO Impersonation)',
+      duration: '14s',
+      risk: 'CRITICAL (96/100) - VOCODER ARTIFACT DETECTED',
+      script:
+        'Hi, I am in a confidential board meeting in London right now. We are closing the acquisition deal within the hour. Please urgently authorize the expedited vendor clearance payment of ₹2.4 Lakhs to the partner escrow account immediately.',
+      cues: ['AI_VOICE_CLONE', 'FINANCIAL_WIRE', 'AUTHORITY_PRESSURE'],
+    },
+    {
       id: 'audio_customs',
       title: '🚨 FedEx Customs & Narcotics Seizure Extortion',
       speaker: 'Customs Desk (FedEx Mumbai)',
@@ -227,7 +247,7 @@ export const GuardianDemoCenter: React.FC<Props> = ({
           }`}
         >
           <Volume2 className="h-4 w-4" />
-          <span>2. Live Voice Scam Player (4)</span>
+          <span>2. Live Voice & AI Clone Player (6)</span>
         </button>
 
         <button
@@ -349,10 +369,10 @@ export const GuardianDemoCenter: React.FC<Props> = ({
             <div className="flex items-center gap-2">
               <Volume2 className="h-4 w-4 text-emerald-400 shrink-0" />
               <span>
-                <strong>How to test real-time listening:</strong> Click <strong>&ldquo;Play Voice Through PC Speakers&rdquo;</strong> while your phone has Guardian AI Live Mic open!
+                <strong>How to test real-time listening & anti-spoofing:</strong> Click <strong>&ldquo;Play Voice Loud&rdquo;</strong> to test live detection, or click <strong>&ldquo;Run in Call AI&rdquo;</strong> to simulate in-stream voice clone radar!
               </span>
             </div>
-            <span className="font-mono text-[10px] text-emerald-400 font-bold">4 HIGH-PRESSURE SCENARIOS</span>
+            <span className="font-mono text-[10px] text-emerald-400 font-bold">6 LIVE ATTACK SCENARIOS</span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -282,6 +282,50 @@ export const guardianApi = {
     return res.json();
   },
 
+  // Voice Clone & Deepfake Anti-Spoofing
+  async detectVoiceClone(data: { call_id: string; caller_phone: string; claimed_identity?: string; transcript_text: string; audio_base64?: string }): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/api/guardian/call/detect-voice-clone`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(data),
+    });
+    return res.json();
+  },
+
+  async requestPhonicChallenge(callId: string): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/api/guardian/call/challenge-request`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ call_id: callId }),
+    });
+    return res.json();
+  },
+
+  async verifyPhonicChallenge(data: { call_id: string; challenge_id: string; response_text: string; latency_ms?: number }): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/api/guardian/call/challenge-verify`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(data),
+    });
+    return res.json();
+  },
+
+  async alertRealContact(data: { call_id: string; caller_phone: string; claimed_identity: string; real_contact_phone?: string }): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/api/guardian/call/alert-real-contact`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(data),
+    });
+    return res.json();
+  },
+
+  async getEmergencyContacts(): Promise<any[]> {
+    const res = await fetch(`${API_BASE_URL}/api/guardian/contacts/emergency`, {
+      headers: authHeaders(),
+    });
+    return res.json();
+  },
+
   // WebSocket Connection
   createEventsWebSocket(onMessage: (event: SecurityEvent) => void, onStatusChange?: (connected: boolean) => void): WebSocket {
     const ws = new WebSocket(`${WS_BASE_URL}/api/ws/events`);

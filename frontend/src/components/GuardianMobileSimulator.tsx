@@ -42,6 +42,11 @@ import {
   Zap,
   Flame,
   Terminal,
+  Fingerprint,
+  UserX,
+  Share2,
+  RadioTower,
+  Cpu,
 } from 'lucide-react';
 import { guardianApi } from '../lib/guardianApi';
 
@@ -80,16 +85,22 @@ export const GuardianMobileSimulator: React.FC<Props> = ({
   const [isMuted, setIsMuted] = useState(false);
   const [interimTranscript, setInterimTranscript] = useState('');
   const [speechState, setSpeechState] = useState<'idle' | 'caller_speaking' | 'ai_speaking' | 'evaluating'>('idle');
-  const [decisionLogs, setDecisionLogs] = useState<Array<{ time: string; type: 'sensor' | 'detect' | 'decision' | 'voice'; message: string }>>([]);
+  const [decisionLogs, setDecisionLogs] = useState<Array<{ time: string; type: 'sensor' | 'detect' | 'decision' | 'voice' | 'clone'; message: string }>>([]);
+
+  // Voice Clone / Deepfake Detection State
+  const [voiceCloneData, setVoiceCloneData] = useState<any>(null);
+  const [activePhonicChallenge, setActivePhonicChallenge] = useState<any>(null);
+  const [challengeStatus, setChallengeStatus] = useState<'idle' | 'issued' | 'passed' | 'failed'>('idle');
+  const [emergencyAlertInfo, setEmergencyAlertInfo] = useState<any>(null);
 
   const recognitionRef = useRef<any>(null);
   const silenceTimerRef = useRef<any>(null);
   const simIntervalRef = useRef<any>(null);
 
-  const addDecisionLog = (type: 'sensor' | 'detect' | 'decision' | 'voice', message: string) => {
+  const addDecisionLog = (type: 'sensor' | 'detect' | 'decision' | 'voice' | 'clone', message: string) => {
     const now = new Date();
     const timeStr = `${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}.${String(Math.floor(now.getMilliseconds() / 100))}`;
-    setDecisionLogs((prev) => [{ time: timeStr, type, message }, ...prev.slice(0, 19)]);
+    setDecisionLogs((prev) => [{ time: timeStr, type, message }, ...prev.slice(0, 24)]);
   };
 
   const speakText = (text: string, onDone?: () => void) => {
@@ -138,6 +149,10 @@ export const GuardianMobileSimulator: React.FC<Props> = ({
     const cues: string[] = [];
     let instantScore = 5;
 
+    if (lower.includes('kidnapped') || lower.includes('accident') || lower.includes('bail') || lower.includes('hospital') || (lower.includes('dad') && lower.includes('jail'))) {
+      cues.push('VOICE_CLONE_KIDNAPPING_BAIL');
+      instantScore = Math.max(instantScore, 96);
+    }
     if (lower.includes('digital arrest') || lower.includes('arrest') || lower.includes('warrant') || lower.includes('secrecy') || lower.includes('video call') || lower.includes('skype')) {
       cues.push('DIGITAL_ARREST_COERCION');
       instantScore = Math.max(instantScore, 95);
@@ -279,9 +294,26 @@ export const GuardianMobileSimulator: React.FC<Props> = ({
   };
 
   // ----------------------------------------------------------------
-  // State: HERO 1 — EQUAL AI CALL ASSISTANT
+  // State: HERO 1 — EQUAL AI CALL ASSISTANT & VOICE CLONE RADAR
   // ----------------------------------------------------------------
   const callPresets = [
+    {
+      id: 'ai_voice_clone_son',
+      name: '🚨 AI Voice Clone Kidnapping & Bail (Impersonating Son)',
+      callerPhone: '+91 99887 76655',
+      callerName: 'Claimed: Rahul Mercer (Son)',
+      category: 'AI_VOICE_CLONE',
+      script: [
+        {
+          text: 'Dad please pick up! I had a terrible car accident in Connaught Place and the police are taking me to the station. Please help me!',
+          expectedLevel: 'SUSPICIOUS',
+        },
+        {
+          text: 'The lawyer says if you transfer ₹35,000 emergency bail bond right now to their settlement UPI, they will drop the charges without filing an FIR. Please hurry and don\'t tell mom!',
+          expectedLevel: 'CRITICAL',
+        },
+      ],
+    },
     {
       id: 'customs_contraband',
       name: '🚨 FedEx Customs & Narcotics Contraband Extortion',
@@ -384,8 +416,8 @@ export const GuardianMobileSimulator: React.FC<Props> = ({
   const [selectedPresetIndex, setSelectedPresetIndex] = useState(0);
   const [callActive, setCallActive] = useState(false);
   const [callId, setCallId] = useState<string>('');
-  const [callerPhone, setCallerPhone] = useState('+91 99102 34567');
-  const [callerName, setCallerName] = useState('Customs Clearance Desk');
+  const [callerPhone, setCallerPhone] = useState('+91 99887 76655');
+  const [callerName, setCallerName] = useState('Claimed: Rahul Mercer (Son)');
   const [turnIndex, setTurnIndex] = useState(0);
   const [transcript, setTranscript] = useState<Array<{ speaker: string; text: string; detected_cues?: string[] }>>([]);
   const [callRiskLevel, setCallRiskLevel] = useState('SAFE');
@@ -431,6 +463,10 @@ export const GuardianMobileSimulator: React.FC<Props> = ({
     setPostCallSummary(null);
     setDecisionLogs([]);
     setIsAutoSimulating(false);
+    setVoiceCloneData(null);
+    setActivePhonicChallenge(null);
+    setChallengeStatus('idle');
+    setEmergencyAlertInfo(null);
 
     const initialGreeting =
       'Hello, this is Guardian AI safety assistant on behalf of the recipient. Please state your name, organization, and the explicit purpose of your call.';
@@ -489,6 +525,25 @@ export const GuardianMobileSimulator: React.FC<Props> = ({
 
       addDecisionLog('detect', `Analyzing caller speech turn with Multi-Agent Engine...`);
 
+      // 1. Parallel Voice Clone Biometric Anti-Spoofing Analysis
+      guardianApi.detectVoiceClone({
+        call_id: callId || 'CALL-ACTIVE',
+        caller_phone: callerPhone,
+        claimed_identity: callerName,
+        transcript_text: utteranceText.trim(),
+      }).then((vcRes) => {
+        setVoiceCloneData(vcRes);
+        if (vcRes.verdict === 'SYNTHETIC_VOICE_CLONE') {
+          addDecisionLog(
+            'clone',
+            `🚨 VOICE CLONE DETECTED: Synthetic probability ${(vcRes.synthetic_probability * 100).toFixed(1)}% (Vocoder Artifacts: ${vcRes.detected_artifacts?.length || 0})`
+          );
+        } else {
+          addDecisionLog('clone', `✓ Voice Biometric: Natural Human Speech ${(100 - vcRes.synthetic_probability * 100).toFixed(1)}% organic.`);
+        }
+      }).catch((e) => console.warn('Voice clone error:', e));
+
+      // 2. Semantic & Trajectory Pipeline
       const res = await guardianApi.processTurnTwoWay({
         call_id: callId,
         caller_phone: callerPhone,
@@ -542,7 +597,7 @@ export const GuardianMobileSimulator: React.FC<Props> = ({
 
       let fallbackReply = 'Statement logged for verification.';
       if (instantScore >= 80) {
-        fallbackReply = 'Security Warning: Official agencies and banks never demand emergency fund transfers, OTPs, or bail bonds over phone calls.';
+        fallbackReply = 'Security Warning: Official agencies and family distress calls requesting immediate wire transfers are flagged for identity verification.';
       }
       setTranscript((prev) => [
         ...prev,
@@ -551,6 +606,80 @@ export const GuardianMobileSimulator: React.FC<Props> = ({
       speakText(fallbackReply);
     } finally {
       setLoadingTurn(false);
+    }
+  };
+
+  // Issue Real-Time Phonic Turing Challenge
+  const handleIssuePhonicChallenge = async () => {
+    try {
+      addDecisionLog('detect', '⚡ Generating unpredictable Phonic Turing Challenge to catch real-time TTS latency...');
+      const challenge = await guardianApi.requestPhonicChallenge(callId || 'CALL-ACTIVE');
+      setActivePhonicChallenge(challenge);
+      setChallengeStatus('issued');
+
+      const challengePrompt = challenge.prompt_text;
+      setTranscript((prev) => [
+        ...prev,
+        {
+          speaker: 'GUARDIAN_AI',
+          text: `Audio Biometric Verification: ${challengePrompt}`,
+          detected_cues: ['PHONIC_TURING_CHALLENGE_ISSUED'],
+        },
+      ]);
+      speakText(`Audio Biometric Verification: ${challengePrompt}`);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // Verify Caller Phonic Response
+  const handleVerifyPhonicResponse = async (simulatedPass: boolean = false) => {
+    if (!activePhonicChallenge) return;
+    try {
+      const responseText = simulatedPass
+        ? 'Blue bluebird balances briskly on bright brass branches'
+        : 'Uhh... dad what are you saying? Just send the money quickly!';
+      const latencyMs = simulatedPass ? 420 : 2350;
+
+      const result = await guardianApi.verifyPhonicChallenge({
+        call_id: callId || 'CALL-ACTIVE',
+        challenge_id: activePhonicChallenge.challenge_id,
+        response_text: responseText,
+        latency_ms: latencyMs,
+      });
+
+      setChallengeStatus(result.passed ? 'passed' : 'failed');
+      addDecisionLog(
+        'detect',
+        `Phonic Challenge Result: ${result.status} (Latency: ${latencyMs}ms). ${result.evaluation_reason}`
+      );
+
+      if (!result.passed) {
+        addDecisionLog('decision', '🚨 Phonic Turing Test FAILED. Caller confirmed as AI synthetic voice clone.');
+        setCallRiskLevel('CRITICAL');
+        setCallRiskScore(99);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // Dispatch Emergency Alert to Genuine Person
+  const handleDispatchEmergencyAlert = async () => {
+    try {
+      const alert = await guardianApi.alertRealContact({
+        call_id: callId || 'CALL-ACTIVE',
+        caller_phone: callerPhone,
+        claimed_identity: callerName,
+        real_contact_phone: '+91 98765 11223',
+      });
+      setEmergencyAlertInfo(alert);
+      addDecisionLog(
+        'decision',
+        `🚨 Out-of-band Emergency Alert dispatched to real person's phone (${alert.target_contact_phone}) via SMS/WhatsApp!`
+      );
+    } catch (e) {
+      console.error(e);
     }
   };
 
@@ -912,7 +1041,7 @@ export const GuardianMobileSimulator: React.FC<Props> = ({
           </div>
 
           <p className="text-xs text-slate-400">
-            Select a protection layer below to experience proactive AI screening, live streaming microphone listening, and real-time autonomous decision making:
+            Select a protection layer below to experience proactive AI screening, real-time Voice Clone deepfake detection, and autonomous decision making:
           </p>
 
           {/* Sub Tab Switcher */}
@@ -980,22 +1109,22 @@ export const GuardianMobileSimulator: React.FC<Props> = ({
         </div>
 
         {/* ----------------------------------------------------------------- */}
-        {/* TAB 1: CALL SCREENING CONTROLS */}
+        {/* TAB 1: CALL SCREENING & VOICE CLONE RADAR */}
         {/* ----------------------------------------------------------------- */}
         {subTab === 'call' && (
           <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-6 space-y-5">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-                  <Bot className="h-4 w-4 text-emerald-400" />
-                  <span>Real-Time Live Call Defense Engine</span>
+                  <Fingerprint className="h-4 w-4 text-emerald-400" />
+                  <span>Real-Time Voice Clone & Call Defense Engine</span>
                 </h3>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Streams live microphone or automated caller audio into the multi-agent detection pipeline.
+                  Pretrained anti-spoofing feature extractor + Phonic Challenge Turing test + Auto-alert real contact.
                 </p>
               </div>
-              <span className="rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-[10px] font-mono font-bold text-emerald-400 border border-emerald-500/30">
-                EQUAL AI MODEL
+              <span className="rounded-full bg-indigo-500/20 px-2.5 py-0.5 text-[10px] font-mono font-bold text-indigo-300 border border-indigo-500/30">
+                AASIST / RAWOPS MODEL
               </span>
             </div>
 
@@ -1057,7 +1186,9 @@ export const GuardianMobileSimulator: React.FC<Props> = ({
                       <span>{preset.name}</span>
                       <span
                         className={`text-[9px] font-mono px-1.5 py-0.5 rounded font-bold ${
-                          preset.category === 'CUSTOMS_EXTORTION' || preset.category === 'DIGITAL_ARREST'
+                          preset.category === 'AI_VOICE_CLONE'
+                            ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
+                            : preset.category === 'CUSTOMS_EXTORTION' || preset.category === 'DIGITAL_ARREST'
                             ? 'bg-rose-500/20 text-rose-400'
                             : preset.category === 'BILL_SCAM' || preset.category === 'SIM_KYC'
                             ? 'bg-amber-500/20 text-amber-400'
@@ -1087,7 +1218,7 @@ export const GuardianMobileSimulator: React.FC<Props> = ({
                   value={customCallerInput}
                   onChange={(e) => setCustomCallerInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleCustomCallerSpeak()}
-                  placeholder="e.g. 'I am Inspector Sharma from Crime Branch. Share OTP 9482 now.'"
+                  placeholder="e.g. 'Dad I had an accident, please transfer ₹35,000 for bail right now.'"
                   className="flex-1 rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none"
                 />
                 <button
@@ -1100,6 +1231,78 @@ export const GuardianMobileSimulator: React.FC<Props> = ({
                 </button>
               </div>
             </div>
+
+            {/* Voice Clone Interactive Controls */}
+            {callActive && (
+              <div className="space-y-3 pt-3 border-t border-slate-800">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-mono text-slate-400 uppercase flex items-center gap-1.5 text-indigo-300 font-bold">
+                    <Fingerprint className="h-3.5 w-3.5 text-indigo-400" />
+                    VOICE CLONE DEFENSE (OPTION B & EMERGENCY ALERT):
+                  </span>
+                  <span className="text-[9px] font-mono text-slate-500">ZERO RAW AUDIO STORED</span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={handleIssuePhonicChallenge}
+                    className="flex items-center justify-center gap-1.5 rounded-xl border border-indigo-500/40 bg-indigo-950/40 hover:bg-indigo-900/50 p-2.5 text-left text-xs font-bold text-indigo-200 transition-all active:scale-95"
+                  >
+                    <Bot className="h-4 w-4 text-indigo-400 shrink-0" />
+                    <span>🧪 Issue Phonic Challenge</span>
+                  </button>
+
+                  <button
+                    onClick={handleDispatchEmergencyAlert}
+                    className="flex items-center justify-center gap-1.5 rounded-xl border border-rose-500/40 bg-rose-950/40 hover:bg-rose-900/50 p-2.5 text-left text-xs font-bold text-rose-200 transition-all active:scale-95"
+                  >
+                    <RadioTower className="h-4 w-4 text-rose-400 shrink-0" />
+                    <span>🚨 Auto-Alert Real Person</span>
+                  </button>
+                </div>
+
+                {/* Challenge Simulator Sub-Bar */}
+                {activePhonicChallenge && (
+                  <div className="rounded-xl border border-indigo-500/40 bg-slate-950 p-3 space-y-2 text-xs">
+                    <div className="flex items-center justify-between font-mono text-[10px] text-indigo-400">
+                      <span>ACTIVE PHONIC CHALLENGE (TURING TEST):</span>
+                      <span className="text-white font-bold">{challengeStatus.toUpperCase()}</span>
+                    </div>
+                    <p className="text-[11px] text-slate-300 italic">&ldquo;{activePhonicChallenge.prompt_text}&rdquo;</p>
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        onClick={() => handleVerifyPhonicResponse(false)}
+                        className="flex-1 rounded-lg bg-rose-600/80 hover:bg-rose-500 py-1.5 text-[10px] font-bold text-white"
+                      >
+                        Simulate AI Fail (Lag &gt;2s)
+                      </button>
+                      <button
+                        onClick={() => handleVerifyPhonicResponse(true)}
+                        className="flex-1 rounded-lg bg-emerald-600/80 hover:bg-emerald-500 py-1.5 text-[10px] font-bold text-white"
+                      >
+                        Simulate Human Pass (&lt;500ms)
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Emergency Alert Info Confirmation */}
+                {emergencyAlertInfo && (
+                  <div className="rounded-xl border border-emerald-500/50 bg-emerald-950/30 p-3 space-y-1 text-xs text-emerald-200 animate-in fade-in">
+                    <div className="font-bold flex items-center gap-1.5 text-emerald-300">
+                      <CheckCircle2 className="h-4 w-4" />
+                      <span>Emergency Alert Dispatched via Out-of-Band SMS!</span>
+                    </div>
+                    <div className="text-[10px] text-slate-300">
+                      Sent to: <strong>{emergencyAlertInfo.target_contact_phone}</strong> (Rahul Mercer - Secondary Verified Line).
+                    </div>
+                    <div className="text-[10px] text-slate-400 font-mono bg-slate-950/80 p-1.5 rounded mt-1">
+                      &ldquo;{emergencyAlertInfo.message_body}&rdquo;
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Quick Defensive Counter-Intervention Chips */}
             {callActive && (
@@ -1167,6 +1370,8 @@ export const GuardianMobileSimulator: React.FC<Props> = ({
                         className={
                           log.type === 'decision'
                             ? 'text-emerald-300 font-bold'
+                            : log.type === 'clone'
+                            ? 'text-purple-300 font-bold'
                             : log.type === 'detect'
                             ? 'text-amber-300'
                             : log.type === 'voice'
@@ -1376,8 +1581,8 @@ export const GuardianMobileSimulator: React.FC<Props> = ({
             <div className="space-y-3">
               <div className="flex items-start justify-between rounded-xl border border-slate-800 bg-slate-950/60 p-3">
                 <div className="space-y-0.5">
-                  <div className="text-xs font-semibold text-white">Telecom / In-Call Screening Service</div>
-                  <p className="text-[11px] text-slate-400">Enables autonomous AI call screening for unknown incoming calls.</p>
+                  <div className="text-xs font-semibold text-white">Telecom / In-Call Screening & Voice Anti-Spoofing</div>
+                  <p className="text-[11px] text-slate-400">Extracts acoustic feature vectors to detect synthetic AI voice clones.</p>
                 </div>
                 <input
                   type="checkbox"
@@ -1452,19 +1657,19 @@ export const GuardianMobileSimulator: React.FC<Props> = ({
           {/* Screen Content Viewport */}
           <div className="my-auto py-3 flex-1 flex flex-col justify-between relative">
             {/* ------------------------------------------------------------- */}
-            {/* SCREEN: EQUAL AI CALL ASSISTANT */}
+            {/* SCREEN: EQUAL AI CALL ASSISTANT & VOICE CLONE RADAR */}
             {/* ------------------------------------------------------------- */}
             {subTab === 'call' && (
               <div className="flex-1 flex flex-col justify-between space-y-3">
                 {!callActive && !postCallSummary && (
                   <div className="my-auto text-center px-4 space-y-3">
-                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-lg shadow-emerald-500/10">
-                      <Bot className="h-8 w-8" />
+                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 shadow-lg shadow-indigo-500/10">
+                      <Fingerprint className="h-8 w-8" />
                     </div>
                     <div>
-                      <div className="text-sm font-bold text-white">Guardian AI Call Assistant</div>
+                      <div className="text-sm font-bold text-white">Guardian Voice Biometric Shield</div>
                       <p className="text-[11px] text-slate-400 mt-1">
-                        Equal AI interaction model with continuous speech streaming, real-time threat scoring & autonomous counter-interventions.
+                        Detects AI synthetic voice clones, neural vocoder artifacts, and deepfakes within seconds.
                       </p>
                     </div>
                     <div className="flex flex-col gap-2 pt-2">
@@ -1511,8 +1716,46 @@ export const GuardianMobileSimulator: React.FC<Props> = ({
                       </div>
                     </div>
 
+                    {/* Voice Clone Biometric Radar Badge */}
+                    {voiceCloneData && (
+                      <div
+                        className={`rounded-xl border p-2.5 text-left space-y-1.5 animate-in fade-in ${
+                          voiceCloneData.verdict === 'SYNTHETIC_VOICE_CLONE'
+                            ? 'border-purple-500/80 bg-gradient-to-r from-purple-950/90 to-slate-900 text-purple-200'
+                            : 'border-emerald-500/40 bg-slate-900 text-emerald-200'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between text-[10px]">
+                          <span className="font-bold flex items-center gap-1 font-mono">
+                            <Fingerprint className="h-3.5 w-3.5 text-purple-400" />
+                            VOICE BIOMETRIC RADAR
+                          </span>
+                          <span
+                            className={`rounded px-1.5 py-0.2 font-mono font-bold text-[9px] ${
+                              voiceCloneData.verdict === 'SYNTHETIC_VOICE_CLONE'
+                                ? 'bg-purple-500 text-white'
+                                : 'bg-emerald-500 text-white'
+                            }`}
+                          >
+                            {voiceCloneData.verdict === 'SYNTHETIC_VOICE_CLONE'
+                              ? `AI SYNTHETIC (${Math.round(voiceCloneData.synthetic_probability * 100)}%)`
+                              : 'NATURAL HUMAN'}
+                          </span>
+                        </div>
+
+                        {voiceCloneData.detected_artifacts?.length > 0 && (
+                          <div className="space-y-0.5 text-[9px] text-purple-300">
+                            <span className="font-bold block">Vocoder Artifacts Detected:</span>
+                            {voiceCloneData.detected_artifacts.slice(0, 2).map((a: string, i: number) => (
+                              <div key={i} className="line-clamp-1">• {a}</div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* Live Dual Transcript Feed */}
-                    <div className="flex-1 max-h-[200px] overflow-y-auto space-y-2 p-1 text-xs pr-1">
+                    <div className="flex-1 max-h-[170px] overflow-y-auto space-y-2 p-1 text-xs pr-1">
                       {transcript.map((t, i) => (
                         <div
                           key={i}
@@ -1940,6 +2183,10 @@ export const GuardianMobileSimulator: React.FC<Props> = ({
                 </div>
 
                 <div className="space-y-2 text-[11px]">
+                  <div className="flex justify-between items-center text-slate-300">
+                    <span>Voice Clone Biometric Radar:</span>
+                    <span className="text-purple-300 font-mono font-bold">AASIST ACTIVE (Zero Raw Audio)</span>
+                  </div>
                   <div className="flex justify-between items-center text-slate-300">
                     <span>Call Screening Engine:</span>
                     <span className="text-emerald-400 font-mono font-bold">READY (Continuous STT)</span>

@@ -17,6 +17,7 @@ from .auth import get_current_user, create_access_token, get_user_by_username
 from .guardian_db import get_db_connection, hash_password_simple
 from .pipeline_guardian import GuardianPipeline
 from .events_manager import events_hub
+from .modules.voice_clone_detector import VoiceCloneDetector
 
 router = APIRouter()
 
@@ -47,6 +48,38 @@ class CallTurnTwoWayRequest(BaseModel):
     caller_text: str
     turn_history: List[Dict[str, Any]] = []
     previous_level: str = "SAFE"
+
+
+class DetectVoiceCloneRequest(BaseModel):
+    call_id: str
+    caller_phone: str = "+91 98765 43210"
+    claimed_identity: Optional[str] = "Family Member"
+    transcript_text: str
+    audio_base64: Optional[str] = None
+
+
+class ChallengeRequestModel(BaseModel):
+    call_id: str
+
+
+class ChallengeVerifyRequest(BaseModel):
+    call_id: str
+    challenge_id: str
+    response_text: str
+    latency_ms: int = 650
+
+
+class AlertRealContactRequest(BaseModel):
+    call_id: str
+    caller_phone: str
+    claimed_identity: str
+    real_contact_phone: Optional[str] = "+91 98765 00000"
+
+
+class EmergencyContactCreateRequest(BaseModel):
+    contact_name: str
+    relationship: str
+    phone_number: str
 
 
 class CallTakeoverRequest(BaseModel):
@@ -236,6 +269,159 @@ async def process_call_turn_twoway(req: CallTurnTwoWayRequest, user: dict = Depe
         user_id=user["id"],
     )
     return res
+
+
+# ----------------------------------------------------
+# VOICE CLONE & DEEPFAKE BIOMETRIC ANTI-SPOOFING
+# ----------------------------------------------------
+
+@router.post("/guardian/call/detect-voice-clone")
+async def detect_voice_clone(req: DetectVoiceCloneRequest, user: dict = Depends(get_current_user)):
+    """
+    Analyzes acoustic features of caller voice to detect AI synthetic speech / deepfake cloning.
+    Extracts only mathematical acoustic feature vectors and discards raw audio immediately.
+    """
+    raw_bytes = None
+    if req.audio_base64:
+        try:
+            import base64
+            raw_bytes = base64.b64decode(req.audio_base64)
+        except Exception:
+            raw_bytes = None
+
+    # 1. Extract Privacy-Preserving Features (raw audio discarded immediately)
+    features = VoiceCloneDetector.extract_privacy_preserving_features(
+        audio_bytes=raw_bytes,
+        transcript_text=req.transcript_text,
+    )
+
+    # 2. Anti-spoofing scoring
+    analysis = VoiceCloneDetector.evaluate_anti_spoofing(
+        features=features,
+        transcript_text=req.transcript_text,
+        claimed_identity=req.claimed_identity,
+    )
+
+    # 3. Persist to DB (storing only extracted features, never raw audio)
+    now = datetime.now(timezone.utc).isoformat()
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        INSERT INTO voice_clone_analyses (
+            user_id, caller_phone, claimed_identity, synthetic_probability, risk_level,
+            verdict, acoustic_features_json, detected_artifacts_json, created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            user["id"],
+            req.caller_phone,
+            req.claimed_identity or "Unknown",
+            analysis["synthetic_probability"],
+            analysis["risk_level"],
+            analysis["verdict"],
+            json.dumps(features),
+            json.dumps(analysis["detected_artifacts"]),
+            now,
+        ),
+    )
+    analysis_id = cur.lastrowid
+    conn.commit()
+    conn.close()
+
+    # 4. Broadcast live WebSocket event
+    if analysis["verdict"] == "SYNTHETIC_VOICE_CLONE":
+        await events_hub.broadcast_event("VOICE_CLONE_DETECTED", {
+            "call_id": req.call_id,
+            "caller_phone": req.caller_phone,
+            "claimed_identity": req.claimed_identity,
+            "synthetic_probability": analysis["synthetic_probability"],
+            "detected_artifacts": analysis["detected_artifacts"],
+            "recommendation": analysis["recommendation"],
+            "timestamp": now,
+        })
+
+    return {
+        "analysis_id": analysis_id,
+        "call_id": req.call_id,
+        "caller_phone": req.caller_phone,
+        "claimed_identity": req.claimed_identity,
+        **analysis,
+    }
+
+
+@router.post("/guardian/call/challenge-request")
+async def request_phonic_challenge(req: ChallengeRequestModel, user: dict = Depends(get_current_user)):
+    """Generates an unpredictable Phonic Turing Challenge to catch real-time TTS model latency."""
+    challenge = VoiceCloneDetector.generate_challenge()
+    await events_hub.broadcast_event("PHONIC_CHALLENGE_ISSUED", {
+        "call_id": req.call_id,
+        "challenge_id": challenge["challenge_id"],
+        "prompt": challenge["prompt_text"],
+    })
+    return challenge
+
+
+@router.post("/guardian/call/challenge-verify")
+async def verify_phonic_challenge(req: ChallengeVerifyRequest, user: dict = Depends(get_current_user)):
+    """Evaluates caller's response and latency against the issued phonic challenge."""
+    result = VoiceCloneDetector.evaluate_challenge_response(
+        challenge_id=req.challenge_id,
+        response_text=req.response_text,
+        latency_ms=req.latency_ms,
+    )
+    await events_hub.broadcast_event("PHONIC_CHALLENGE_EVALUATED", {
+        "call_id": req.call_id,
+        "challenge_id": req.challenge_id,
+        "passed": result["passed"],
+        "latency_ms": req.latency_ms,
+        "reason": result["evaluation_reason"],
+    })
+    return result
+
+
+@router.post("/guardian/call/alert-real-contact")
+async def alert_real_contact(req: AlertRealContactRequest, user: dict = Depends(get_current_user)):
+    """Dispatches out-of-band emergency security alert to genuine person's secondary verified channel."""
+    alert = VoiceCloneDetector.create_real_person_emergency_alert(
+        claimed_identity=req.claimed_identity,
+        caller_phone=req.caller_phone,
+        real_contact_phone=req.real_contact_phone or "+91 98765 00000",
+        call_id=req.call_id,
+    )
+    await events_hub.broadcast_event("EMERGENCY_ALERT_DISPATCHED", alert)
+    return alert
+
+
+@router.get("/guardian/contacts/emergency")
+def get_emergency_contacts(user: dict = Depends(get_current_user)):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM emergency_contacts WHERE user_id = ? ORDER BY id ASC", (user["id"],))
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+    if not rows:
+        return [
+            {"id": 1, "user_id": user["id"], "contact_name": "Rahul Mercer", "relationship": "Son", "phone_number": "+91 98765 11223", "is_verified": 1},
+            {"id": 2, "user_id": user["id"], "contact_name": "Elena Mercer", "relationship": "Mother", "phone_number": "+91 98765 44556", "is_verified": 1},
+        ]
+    return rows
+
+
+@router.post("/guardian/contacts/emergency")
+def add_emergency_contact(req: EmergencyContactCreateRequest, user: dict = Depends(get_current_user)):
+    now = datetime.now(timezone.utc).isoformat()
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO emergency_contacts (user_id, contact_name, relationship, phone_number, is_verified, created_at) VALUES (?, ?, ?, ?, 1, ?)",
+        (user["id"], req.contact_name, req.relationship, req.phone_number, now),
+    )
+    contact_id = cur.lastrowid
+    conn.commit()
+    conn.close()
+    return {"id": contact_id, "status": "success", "message": "Emergency contact saved"}
 
 
 @router.post("/guardian/call/takeover")

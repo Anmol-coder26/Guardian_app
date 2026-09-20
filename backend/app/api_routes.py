@@ -18,6 +18,7 @@ from .guardian_db import get_db_connection, hash_password_simple
 from .pipeline_guardian import GuardianPipeline
 from .events_manager import events_hub
 from .modules.voice_clone_detector import VoiceCloneDetector
+from .modules.sms_scam_classifier import SmsScamClassifier
 
 router = APIRouter()
 
@@ -123,6 +124,18 @@ class ThreatReportRequest(BaseModel):
     entity_value: str
     risk_category: str
     notes: Optional[str] = None
+
+
+class SmsClassifyRequest(BaseModel):
+    text: str
+    sender: Optional[str] = "UNKNOWN"
+    message_id: Optional[str] = None
+
+
+class PostTriggerActionRequest(BaseModel):
+    message_id: str
+    event_type: str  # LINK_CLICKED, APP_INSTALLED, REMOTE_TOOL_LAUNCHED, OTP_COPIED
+    target_package_or_url: str
 
 
 # ----------------------------------------------------
@@ -733,3 +746,74 @@ async def download_apk_endpoint():
                 media_type="application/vnd.android.package-archive"
             )
     raise HTTPException(status_code=404, detail="Guardian Android APK package not found")
+
+
+# ----------------------------------------------------
+# SMS SOCIAL-ENGINEERING CLASSIFIER & POST-TRIGGER WATCHDOG
+# ----------------------------------------------------
+
+@router.post("/guardian/sms/classify")
+async def classify_sms_endpoint(req: SmsClassifyRequest):
+    """
+    Classifies incoming SMS using DistilBERT/TFLite-inspired social engineering NLP vectors.
+    Flags urgency, OTP credential harvesting, unverified external links, authority coercion.
+    Activates scoped 180-second post-trigger watchdog if risk is HIGH or CRITICAL.
+    """
+    res = SmsScamClassifier.classify_sms(
+        text=req.text,
+        sender=req.sender or "UNKNOWN",
+        message_id=req.message_id,
+    )
+
+    # Broadcast event via WebSocket
+    await events_hub.broadcast({
+        "type": "SMS_CLASSIFIED",
+        "message_id": res.message_id,
+        "risk_level": res.risk_level,
+        "threat_category": res.threat_category,
+        "confidence": res.confidence_score,
+        "watchdog_active": res.post_trigger_watchdog_activated,
+        "nlp_model": res.nlp_model,
+        "vectors": res.vectors.dict(),
+    })
+
+    return res.dict()
+
+
+@router.post("/guardian/sms/post-trigger/log-action")
+async def log_post_trigger_action(req: PostTriggerActionRequest):
+    """
+    Logs user action (link tap, app install, remote tool launch) within the scoped 180s watchdog window.
+    Raises threat escalation overlay if high-risk action follows flagged SMS.
+    """
+    event = SmsScamClassifier.record_post_trigger_event(
+        message_id=req.message_id,
+        event_type=req.event_type,
+        target_package_or_url=req.target_package_or_url,
+    )
+
+    if not event:
+        return {"status": "ignored", "message": "No active watchdog window for message or window expired"}
+
+    # Broadcast threat escalation event
+    await events_hub.broadcast({
+        "type": "POST_TRIGGER_ACTION_LOGGED",
+        "message_id": event.message_id,
+        "event_type": event.event_type,
+        "target": event.target_package_or_url,
+        "seconds_after_sms": event.seconds_after_sms,
+        "is_threat_escalation": event.is_threat_escalation,
+        "remediation": event.remediation_action,
+    })
+
+    return {
+        "status": "success",
+        "event": event.dict(),
+    }
+
+
+@router.get("/guardian/sms/post-trigger/status")
+def get_watchdog_status():
+    """Returns active scoped watchdog sessions and captured post-trigger events."""
+    return SmsScamClassifier.get_active_watchdog_status()
+

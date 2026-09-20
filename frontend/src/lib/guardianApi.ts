@@ -326,6 +326,32 @@ export const guardianApi = {
     return res.json();
   },
 
+  // SMS Social-Engineering & Post-Trigger Watchdog
+  async classifySms(data: { text: string; sender?: string; message_id?: string }): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/api/guardian/sms/classify`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(data),
+    });
+    return res.json();
+  },
+
+  async logPostTriggerAction(data: { message_id: string; event_type: string; target_package_or_url: string }): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/api/guardian/sms/post-trigger/log-action`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(data),
+    });
+    return res.json();
+  },
+
+  async getWatchdogStatus(): Promise<any[]> {
+    const res = await fetch(`${API_BASE_URL}/api/guardian/sms/post-trigger/status`, {
+      headers: authHeaders(),
+    });
+    return res.json();
+  },
+
   // WebSocket Connection
   createEventsWebSocket(onMessage: (event: SecurityEvent) => void, onStatusChange?: (connected: boolean) => void): WebSocket {
     const ws = new WebSocket(`${WS_BASE_URL}/api/ws/events`);

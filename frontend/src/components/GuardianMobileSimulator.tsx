@@ -930,6 +930,9 @@ export const GuardianMobileSimulator: React.FC<Props> = ({
 
   const [selectedNotifIndex, setSelectedNotifIndex] = useState(0);
   const [activeNotif, setActiveNotif] = useState<any>(null);
+  const [smsNlpVectors, setSmsNlpVectors] = useState<any>(null);
+  const [watchdogSecondsRemaining, setWatchdogSecondsRemaining] = useState<number>(0);
+  const [postTriggerAlert, setPostTriggerAlert] = useState<any>(null);
   const [notifHistory, setNotifHistory] = useState<any[]>([
     {
       id: '1',
@@ -953,64 +956,126 @@ export const GuardianMobileSimulator: React.FC<Props> = ({
   const [customNotifTitle, setCustomNotifTitle] = useState('');
   const [customNotifText, setCustomNotifText] = useState('');
 
-  const handlePostNotification = (preset: typeof notifPresets[0]) => {
+  const handlePostNotification = async (preset: typeof notifPresets[0]) => {
     const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    const notifObj = {
-      id: Math.random().toString(),
-      app: preset.app,
-      pkg: preset.pkg,
-      title: preset.title,
-      text: preset.text,
-      level: preset.expectedLevel,
-      score: preset.score,
-      reasons: preset.reasons,
-      time: timeStr,
-      isUpdate: false,
-    };
-    setActiveNotif(notifObj);
-    setNotifHistory((prev) => [notifObj, ...prev]);
+    
+    // Call DistilBERT classification API
+    try {
+      const nlpRes = await guardianApi.classifySms({
+        text: preset.text,
+        sender: preset.title,
+        message_id: `sms_${Date.now()}`,
+      });
+
+      setSmsNlpVectors(nlpRes.vectors);
+      if (nlpRes.post_trigger_watchdog_activated) {
+        setWatchdogSecondsRemaining(180);
+      } else {
+        setWatchdogSecondsRemaining(0);
+      }
+      setPostTriggerAlert(null);
+
+      const notifObj = {
+        id: nlpRes.message_id || Math.random().toString(),
+        app: preset.app,
+        pkg: preset.pkg,
+        title: preset.title,
+        text: preset.text,
+        level: nlpRes.risk_level || preset.expectedLevel,
+        score: Math.round(nlpRes.confidence_score * 100) || preset.score,
+        reasons: preset.reasons,
+        explanation: nlpRes.explanation,
+        action: nlpRes.recommended_action,
+        nlp_model: nlpRes.nlp_model,
+        time: timeStr,
+        isUpdate: false,
+      };
+      setActiveNotif(notifObj);
+      setNotifHistory((prev) => [notifObj, ...prev]);
+    } catch {
+      const notifObj = {
+        id: Math.random().toString(),
+        app: preset.app,
+        pkg: preset.pkg,
+        title: preset.title,
+        text: preset.text,
+        level: preset.expectedLevel,
+        score: preset.score,
+        reasons: preset.reasons,
+        time: timeStr,
+        isUpdate: false,
+      };
+      setActiveNotif(notifObj);
+      setNotifHistory((prev) => [notifObj, ...prev]);
+    }
+
     if (onIncidentCreated) onIncidentCreated();
   };
 
-  const handleSendCustomNotification = () => {
+  const handleSendCustomNotification = async () => {
     if (!customNotifText.trim()) return;
     const title = customNotifTitle.trim() || 'Incoming SMS Alert';
     const text = customNotifText.trim();
-    const lower = text.toLowerCase();
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-    let level = 'SAFE';
-    let score = 5;
-    const reasons: string[] = [];
+    try {
+      const nlpRes = await guardianApi.classifySms({
+        text,
+        sender: title,
+        message_id: `sms_${Date.now()}`,
+      });
 
-    if (lower.includes('http') || lower.includes('.top') || lower.includes('.xyz') || lower.includes('kyc')) {
-      level = 'CRITICAL';
-      score = 90;
-      reasons.push('Deceptive link or credential harvesting keyword detected in alert');
-    } else if (lower.includes('otp') || lower.includes('code') || lower.includes('share') || lower.includes('urgent')) {
-      level = 'CRITICAL';
-      score = 94;
-      reasons.push('Sensitive OTP / Security code solicitation cue identified');
+      setSmsNlpVectors(nlpRes.vectors);
+      if (nlpRes.post_trigger_watchdog_activated) {
+        setWatchdogSecondsRemaining(180);
+      } else {
+        setWatchdogSecondsRemaining(0);
+      }
+      setPostTriggerAlert(null);
+
+      const notifObj = {
+        id: nlpRes.message_id || Math.random().toString(),
+        app: 'Messages',
+        pkg: 'com.google.android.apps.messaging',
+        title,
+        text,
+        level: nlpRes.risk_level,
+        score: Math.round(nlpRes.confidence_score * 100),
+        reasons: nlpRes.detected_keywords?.map((k: string) => `Flagged keyword: #${k}`) || ['Social engineering vector identified'],
+        explanation: nlpRes.explanation,
+        action: nlpRes.recommended_action,
+        nlp_model: nlpRes.nlp_model,
+        time: timeStr,
+        isUpdate: false,
+      };
+
+      setActiveNotif(notifObj);
+      setNotifHistory((prev) => [notifObj, ...prev]);
+    } catch {
+      // Fallback
     }
 
-    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    const notifObj = {
-      id: Math.random().toString(),
-      app: 'Messages',
-      pkg: 'com.google.android.apps.messaging',
-      title,
-      text,
-      level,
-      score,
-      reasons: reasons.length ? reasons : ['Notification content analyzed clean'],
-      time: timeStr,
-      isUpdate: false,
-    };
-
-    setActiveNotif(notifObj);
-    setNotifHistory((prev) => [notifObj, ...prev]);
     setCustomNotifTitle('');
     setCustomNotifText('');
     if (onIncidentCreated) onIncidentCreated();
+  };
+
+  const handleSimulatePostTriggerAction = async (actionType: 'LINK_CLICKED' | 'REMOTE_TOOL_LAUNCHED') => {
+    if (!activeNotif) return;
+    try {
+      const target = actionType === 'LINK_CLICKED' ? 'https://hdfc-bankk-kyc.top/reward-claim' : 'com.teamviewer.quicksupport.market';
+      const res = await guardianApi.logPostTriggerAction({
+        message_id: activeNotif.id,
+        event_type: actionType,
+        target_package_or_url: target,
+      });
+      if (res?.event) {
+        setPostTriggerAlert(res.event);
+        addDecisionLog('detect', `⏱️ Post-Trigger Watchdog: ${res.event.remediation_action}`);
+      }
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   return (
@@ -2137,14 +2202,61 @@ export const GuardianMobileSimulator: React.FC<Props> = ({
                       <div className="text-xs font-bold text-white">{activeNotif.title}</div>
                       <div className="text-[11px] text-slate-300 leading-snug">&ldquo;{activeNotif.text}&rdquo;</div>
 
-                      {activeNotif.reasons && (
-                        <div className="rounded-lg bg-slate-950/80 p-2 text-[9px] border border-rose-900/40 space-y-0.5">
-                          <div className="font-bold text-rose-400 uppercase">Threat Triaged in 14ms:</div>
-                          {activeNotif.reasons.map((r: string, i: number) => (
-                            <div key={i} className="text-slate-300">
-                              • {r}
-                            </div>
-                          ))}
+                      {/* DistilBERT Social-Engineering NLP Vectors */}
+                      {smsNlpVectors && (
+                        <div className="rounded-xl border border-indigo-500/30 bg-indigo-950/40 p-2 space-y-1 text-[9px] font-mono">
+                          <div className="flex items-center justify-between text-indigo-300 font-bold">
+                            <span>🤖 DISTILBERT-LITE NLP VECTORS</span>
+                            <span>TFLite-Mobile</span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-1 text-[8px] text-slate-300">
+                            <div>Urgency: {(smsNlpVectors.urgency_score * 100).toFixed(0)}%</div>
+                            <div>OTP Harvest: {(smsNlpVectors.otp_credential_score * 100).toFixed(0)}%</div>
+                            <div>Link Threat: {(smsNlpVectors.suspicious_link_score * 100).toFixed(0)}%</div>
+                            <div>Authority Coercion: {(smsNlpVectors.authority_threat_score * 100).toFixed(0)}%</div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Scoped Time-Boxed Watchdog Active Badge */}
+                      {watchdogSecondsRemaining > 0 && (
+                        <div className="rounded-xl border border-amber-500/40 bg-amber-950/30 p-2 text-[9px] space-y-1.5">
+                          <div className="flex items-center justify-between font-mono font-bold text-amber-300">
+                            <span>⏱️ 180s POST-TRIGGER WATCHDOG</span>
+                            <span className="animate-pulse">ACTIVE SENSOR</span>
+                          </div>
+                          <p className="text-[8px] text-slate-300">
+                            UsageStatsManager is actively monitoring for link taps or malicious APK installs following this flagged SMS.
+                          </p>
+                          <div className="grid grid-cols-2 gap-1 pt-1">
+                            <button
+                              onClick={() => handleSimulatePostTriggerAction('LINK_CLICKED')}
+                              className="rounded-lg bg-amber-600 hover:bg-amber-500 py-1 text-[8px] font-bold text-white shadow-sm"
+                            >
+                              🌐 Tap Phish Link
+                            </button>
+                            <button
+                              onClick={() => handleSimulatePostTriggerAction('REMOTE_TOOL_LAUNCHED')}
+                              className="rounded-lg bg-rose-600 hover:bg-rose-500 py-1 text-[8px] font-bold text-white shadow-sm"
+                            >
+                              ⚠️ Install AnyDesk
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Post-Trigger Escalation Banner */}
+                      {postTriggerAlert && (
+                        <div className="rounded-xl border border-rose-500 bg-rose-950 p-2.5 space-y-1 text-left animate-in zoom-in-95">
+                          <div className="text-[10px] font-bold text-rose-200">
+                            {postTriggerAlert.is_threat_escalation ? '🚨 THREAT ESCALATION DETECTED' : 'Activity Logged'}
+                          </div>
+                          <div className="text-[9px] text-rose-300 font-mono">
+                            Event: {postTriggerAlert.event_type} (+{postTriggerAlert.seconds_after_sms}s after SMS)
+                          </div>
+                          <div className="text-[9px] text-white font-semibold">
+                            {postTriggerAlert.remediation_action}
+                          </div>
                         </div>
                       )}
                     </div>
